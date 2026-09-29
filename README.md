@@ -6,6 +6,18 @@
 
 ---
 
+## 给 AI Agent 安装
+
+可以直接把这句话发给你的 AI agent：
+
+```text
+帮我安装 prompt-hillclimb：https://raw.githubusercontent.com/bilppppp/prompt-hillclimb/main/install.md
+```
+
+完整安装指南详见 [install.md](install.md)。
+
+---
+
 ## 1. 适用与不适用场景
 
 ### 适用场景
