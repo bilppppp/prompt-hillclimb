@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment and secrets
+*token*
+*.env
+*.env.*
+.venv/
+venv/
+
+# macOS files
+.DS_Store
+
+# hillclimb runs and scratch output
+.hillclimb/
