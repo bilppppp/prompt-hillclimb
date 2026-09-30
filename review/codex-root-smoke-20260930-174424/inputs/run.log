@@ -1,0 +1,53 @@
+LIMITED SMOKE RUN — NOT A FULL EVALUATION
+
+Estimated model calls:
+  Baseline: 4
+  Round 1: 5
+  Final: 2
+  Total: ~11
+
+Starting Hillclimb run in .hillclimb/20260930-174424
+
+--- Running Baseline ---
+Baseline Train: 100.0, Val: 100.0
+
+--- Round 1 ---
+Round 1 REVERT: Train 100.0, Val 100.0 (Gain: +0.0)
+
+--- Running Final Evaluation ---
+Final Score: 33.3
+
+LIMITED SMOKE RUN — NOT A FULL EVALUATION
+
+# Prompt Hillclimb
+
+Runner: pi
+Rounds attempted: 1
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 100.0
+Val: 100.0
+
+## Round 1
+
+Train: 100.0
+Val: 100.0
+Gain: +0.0
+Decision: REVERT
+
+## Best
+
+Train: 100.0
+Val: 100.0
+
+## Final
+
+Final: 33.3
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: .hillclimb/20260930-174424

@@ -1,0 +1,10 @@
+{
+  "target": ".hillclimb/codex-root-smoke-inputs/target-prompt.md",
+  "eval": ".hillclimb/codex-root-smoke-inputs/evals.jsonl",
+  "runner": "pi",
+  "rounds": 1,
+  "repeats": 1,
+  "min_gain": 3.0,
+  "max_growth": 1.5,
+  "limit": 1
+}
