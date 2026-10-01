@@ -1,0 +1,63 @@
+LIMITED SMOKE RUN — NOT A FULL EVALUATION
+
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+Starting Hillclimb run in .hillclimb/20261001-122743
+
+--- Running Baseline ---
+Baseline Train: 100.0, Val: 100.0
+
+--- Running Preflight ---
+PREFLIGHT WARNING: Evaluation headroom is low (baseline train 100.0 and val 100.0 both >= 95%). Optimization has limited upside.
+
+No train failures detected before Round 1. Stopping optimization.
+
+--- Running Final Blind Comparison ---
+Original == Best
+Final Blind Comparison: Original=66.7, Best=66.7 (shared with Original), Delta=0.0 (no accepted prompt change)
+
+LIMITED SMOKE RUN — NOT A FULL EVALUATION
+
+# Prompt Hillclimb
+
+Execution backend: pi
+Rounds configured: 1
+Rounds executed: 0
+Stop reason: NO_TRAIN_FAILURE_SIGNAL
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 100.0
+Val: 100.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: True (warning: evaluation headroom is low; baseline train and val both >= 95%)
+Grader disagreement: 0/3 (0.0%)
+
+## Best
+
+Train: 100.0
+Val: 100.0
+
+## Final Blind Comparison
+
+Original == Best
+Original: 66.7
+Best: 66.7 (shared with Original)
+Delta: 0.0 (no accepted prompt change)
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: .hillclimb/20261001-122743
+
+REAL_SMOKE_RETURN_CODE:0

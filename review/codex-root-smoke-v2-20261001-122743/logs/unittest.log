@@ -1,0 +1,863 @@
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+Error: Final evaluation failed on Original: Original final crashed
+Final comparison: FAILED
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+Error: Final evaluation failed on Best: Best final crashed
+Final comparison: FAILED
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+Error: Final evaluation failed on Original: Original final crashed
+Final comparison: FAILED
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+ABORT: Baseline train evaluation failed: Baseline train failed
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+PREFLIGHT FAILED: Preflight noise measurement failed on val (target): Val timeout
+ABORT: Preflight failed: Preflight noise measurement failed on val (target): Val timeout
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+WARNING: Global instructions detected at /Users/gravity/.codex/AGENTS.md. codex exec cannot completely disable global instructions and may contaminate evaluations.
+WARNING: Global skills detected at /Users/gravity/.codex/skills. Codex -s read-only restricts file writes, but does NOT disable reading files or tools.
+Warning: Stall categorizer failed: Categorizer agent crashed
+----------------------------------------------------------------------
+Ran 57 tests in 0.037s
+
+OK
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmp3fj88gok/run_final_diff
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 KEEP: Train 50.0, Val 90.0 (Gain: +10.0)
+
+--- Running Final Blind Comparison ---
+Final Blind Comparison: Original=80.0, Best=70.0, Delta=-10.0
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 1
+Rounds executed: 1
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 50.0
+Val: 90.0
+Gain: +10.0
+Decision: KEEP
+
+## Best
+
+Train: 50.0
+Val: 90.0
+
+## Final Blind Comparison
+
+Original: 80.0
+Best: 70.0
+Delta: -10.0
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmp3fj88gok/run_final_diff
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpremkjadi/run_final_same
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 REVERT: Train 50.0, Val 80.0 (Gain: +0.0)
+
+--- Running Final Blind Comparison ---
+Original == Best
+Final Blind Comparison: Original=85.0, Best=85.0 (shared with Original), Delta=0.0 (no accepted prompt change)
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 1
+Rounds executed: 1
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 50.0
+Val: 80.0
+Gain: +0.0
+Decision: REVERT
+
+## Best
+
+Train: 50.0
+Val: 80.0
+
+## Final Blind Comparison
+
+Original == Best
+Original: 85.0
+Best: 85.0 (shared with Original)
+Delta: 0.0 (no accepted prompt change)
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpremkjadi/run_final_same
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpdteaff4z/run_final_divergent_original_fails
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 KEEP: Train 50.0, Val 90.0 (Gain: +10.0)
+
+--- Running Final Blind Comparison ---
+Final comparison: FAILED
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 1
+Rounds executed: 1
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 50.0
+Val: 90.0
+Gain: +10.0
+Decision: KEEP
+
+## Best
+
+Train: 50.0
+Val: 90.0
+
+## Final Blind Comparison
+
+Final comparison: FAILED
+Original: FAILED (target: Original final crashed)
+Best: 90.0
+Delta: FAILED
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpdteaff4z/run_final_divergent_original_fails
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpdteaff4z/run_final_divergent_best_fails
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 KEEP: Train 50.0, Val 90.0 (Gain: +10.0)
+
+--- Running Final Blind Comparison ---
+Final comparison: FAILED
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 1
+Rounds executed: 1
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 50.0
+Val: 90.0
+Gain: +10.0
+Decision: KEEP
+
+## Best
+
+Train: 50.0
+Val: 90.0
+
+## Final Blind Comparison
+
+Final comparison: FAILED
+Original: 80.0
+Best: FAILED (target: Best final crashed)
+Delta: FAILED
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpdteaff4z/run_final_divergent_best_fails
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpdteaff4z/run_final_identical_shared_fails
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 REVERT: Train 50.0, Val 80.0 (Gain: +0.0)
+
+--- Running Final Blind Comparison ---
+Original == Best
+Final comparison: FAILED
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 1
+Rounds executed: 1
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 50.0
+Val: 80.0
+Gain: +0.0
+Decision: REVERT
+
+## Best
+
+Train: 50.0
+Val: 80.0
+
+## Final Blind Comparison
+
+Original == Best
+Final comparison: FAILED
+Original: FAILED (target: Original final crashed)
+Best: FAILED (target: Original final crashed) (shared with Original)
+Delta: FAILED
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpdteaff4z/run_final_identical_shared_fails
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmps01bza1m/run_test_base_err
+
+--- Running Baseline ---
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmptzpscgu6/run_test_cand_err
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 100.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Candidate train evaluation failed in Round 1: Candidate target crashed
+
+--- Running Final Blind Comparison ---
+Original == Best
+Final Blind Comparison: Original=100.0, Best=100.0 (shared with Original), Delta=0.0 (no accepted prompt change)
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 1
+Rounds executed: 1
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 100.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Status: INVALID
+Reason: candidate train error (target): Candidate target crashed
+Decision: REVERT
+
+## Best
+
+Train: 50.0
+Val: 100.0
+
+## Final Blind Comparison
+
+Original == Best
+Original: 100.0
+Best: 100.0 (shared with Original)
+Delta: 0.0 (no accepted prompt change)
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmptzpscgu6/run_test_cand_err
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Round 2: 5
+  Round 3: 5
+  Stall categorizer: up to 1 call (conditional if stalled after 2 reverts)
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~27
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmp6jvbfl20/run_perfect_baseline
+
+--- Running Baseline ---
+Baseline Train: 100.0, Val: 100.0
+
+--- Running Preflight ---
+PREFLIGHT WARNING: Evaluation headroom is low (baseline train 100.0 and val 100.0 both >= 95%). Optimization has limited upside.
+
+No train failures detected before Round 1. Stopping optimization.
+
+--- Running Final Blind Comparison ---
+Original == Best
+Final Blind Comparison: Original=100.0, Best=100.0 (shared with Original), Delta=0.0 (no accepted prompt change)
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 3
+Rounds executed: 0
+Stop reason: NO_TRAIN_FAILURE_SIGNAL
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 100.0
+Val: 100.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: True (warning: evaluation headroom is low; baseline train and val both >= 95%)
+Grader disagreement: 0/1 (0.0%)
+
+## Best
+
+Train: 100.0
+Val: 100.0
+
+## Final Blind Comparison
+
+Original == Best
+Original: 100.0
+Best: 100.0 (shared with Original)
+Delta: 0.0 (no accepted prompt change)
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmp6jvbfl20/run_perfect_baseline
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Round 2: 5
+  Round 3: 5
+  Stall categorizer: up to 1 call (conditional if stalled after 2 reverts)
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~27
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpaz2qvxgy/run_keep_full_pass
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 KEEP: Train 100.0, Val 90.0 (Gain: +10.0)
+
+No train failures detected before Round 2. Stopping optimization.
+
+--- Running Final Blind Comparison ---
+Final Blind Comparison: Original=95.0, Best=95.0, Delta=+0.0
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 3
+Rounds executed: 1
+Stop reason: NO_TRAIN_FAILURE_SIGNAL
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 100.0
+Val: 90.0
+Gain: +10.0
+Decision: KEEP
+
+## Best
+
+Train: 100.0
+Val: 90.0
+
+## Final Blind Comparison
+
+Original: 95.0
+Best: 95.0
+Delta: +0.0
+
+Best prompt:
+best-prompt.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpaz2qvxgy/run_keep_full_pass
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Round 2: 5
+  Round 3: 5
+  Stall categorizer: up to 1 call (conditional if stalled after 2 reverts)
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~27
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpsyaowluq/run_preflight_abort
+
+--- Running Baseline ---
+Baseline Train: 80.0, Val: 80.0
+
+--- Running Preflight ---
+PREFLIGHT FAILED: Preflight noise measurement failed on val (target): Val timeout
+ABORT: Preflight failed: Preflight noise measurement failed on val (target): Val timeout
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Round 2: 5
+  Round 3: 5
+  Round 4: 5
+  Round 5: 5
+  Stall categorizer: up to 1 call (conditional if stalled after 2 reverts)
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~37
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpz86_oyh6/run_stall_test
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 REVERT: Train 50.0, Val 80.0 (Gain: +0.0)
+
+--- Round 2 ---
+Round 2 REVERT: Train 50.0, Val 80.0 (Gain: +0.0)
+
+Stall detected after 2 consecutive reverts in Round 2.
+
+--- Running Final Blind Comparison ---
+Original == Best
+Final Blind Comparison: Original=80.0, Best=80.0 (shared with Original), Delta=0.0 (no accepted prompt change)
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 5
+Rounds executed: 2
+Stop reason: STALLED_AFTER_2_REVERTS
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 50.0
+Val: 80.0
+Gain: +0.0
+Decision: REVERT
+
+## Round 2
+
+Train: 50.0
+Val: 80.0
+Gain: +0.0
+Decision: REVERT
+
+## Best
+
+Train: 50.0
+Val: 80.0
+
+## Final Blind Comparison
+
+Original == Best
+Original: 80.0
+Best: 80.0 (shared with Original)
+Delta: 0.0 (no accepted prompt change)
+
+Best prompt:
+best-prompt.md
+
+Stall analysis:
+stall-analysis.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpz86_oyh6/run_stall_test
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Round 2: 5
+  Round 3: 5
+  Round 4: 5
+  Round 5: 5
+  Round 6: 5
+  Round 7: 5
+  Round 8: 5
+  Round 9: 5
+  Round 10: 5
+  Stall categorizer: up to 1 call (conditional if stalled after 2 reverts)
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~62
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpih96hyem/run_reset_test
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 REVERT: Train 50.0, Val 80.0 (Gain: +0.0)
+
+--- Round 2 ---
+Candidate train evaluation failed in Round 2: Target error
+
+--- Round 3 ---
+Round 3 REVERT: Train 50.0, Val 80.0 (Gain: +0.0)
+
+--- Round 4 ---
+Round 4 KEEP: Train 50.0, Val 90.0 (Gain: +10.0)
+
+--- Round 5 ---
+Round 5 REVERT: Train 50.0, Val 80.0 (Gain: -10.0)
+
+--- Round 6 ---
+Round 6 REVERT: Train 50.0, Val 80.0 (Gain: -10.0)
+
+Stall detected after 2 consecutive reverts in Round 6.
+
+--- Running Final Blind Comparison ---
+Final Blind Comparison: Original=80.0, Best=80.0, Delta=+0.0
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 10
+Rounds executed: 6
+Stop reason: STALLED_AFTER_2_REVERTS
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 50.0
+Val: 80.0
+Gain: +0.0
+Decision: REVERT
+
+## Round 2
+
+Status: INVALID
+Reason: candidate train error (target): Target error
+Decision: REVERT
+
+## Round 3
+
+Train: 50.0
+Val: 80.0
+Gain: +0.0
+Decision: REVERT
+
+## Round 4
+
+Train: 50.0
+Val: 90.0
+Gain: +10.0
+Decision: KEEP
+
+## Round 5
+
+Train: 50.0
+Val: 80.0
+Gain: -10.0
+Decision: REVERT
+
+## Round 6
+
+Train: 50.0
+Val: 80.0
+Gain: -10.0
+Decision: REVERT
+
+## Best
+
+Train: 50.0
+Val: 90.0
+
+## Final Blind Comparison
+
+Original: 80.0
+Best: 80.0
+Delta: +0.0
+
+Best prompt:
+best-prompt.md
+
+Stall analysis:
+stall-analysis.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpih96hyem/run_reset_test
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Round 2: 5
+  Round 3: 5
+  Round 4: 5
+  Stall categorizer: up to 1 call (conditional if stalled after 2 reverts)
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~32
+
+Starting Hillclimb run in /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpk1192rmy/run_stall_fail
+
+--- Running Baseline ---
+Baseline Train: 50.0, Val: 80.0
+
+--- Running Preflight ---
+
+--- Round 1 ---
+Round 1 REVERT: Train 50.0, Val 80.0 (Gain: +0.0)
+
+--- Round 2 ---
+Round 2 REVERT: Train 50.0, Val 80.0 (Gain: +0.0)
+
+Stall detected after 2 consecutive reverts in Round 2.
+
+--- Running Final Blind Comparison ---
+Original == Best
+Final Blind Comparison: Original=80.0, Best=80.0 (shared with Original), Delta=0.0 (no accepted prompt change)
+
+# Prompt Hillclimb
+
+Execution backend: codex
+Rounds configured: 4
+Rounds executed: 2
+Stop reason: STALLED_AFTER_2_REVERTS
+Repeats: 1
+Min gain: 3.0
+
+## Baseline
+
+Train: 50.0
+Val: 80.0
+
+## Preflight
+
+Observed val variation: 0.0
+Headroom warning: False
+Grader disagreement: 0/1 (0.0%)
+
+## Round 1
+
+Train: 50.0
+Val: 80.0
+Gain: +0.0
+Decision: REVERT
+
+## Round 2
+
+Train: 50.0
+Val: 80.0
+Gain: +0.0
+Decision: REVERT
+
+## Best
+
+Train: 50.0
+Val: 80.0
+
+## Final Blind Comparison
+
+Original == Best
+Original: 80.0
+Best: 80.0 (shared with Original)
+Delta: 0.0 (no accepted prompt change)
+
+Best prompt:
+best-prompt.md
+
+Stall analysis:
+stall-analysis.md
+
+Outputs written to: /var/folders/8b/5qh9tbm53z5bbcqctkwrxz000000gn/T/tmpk1192rmy/run_stall_fail
+UNITTEST_EXIT_CODE:0

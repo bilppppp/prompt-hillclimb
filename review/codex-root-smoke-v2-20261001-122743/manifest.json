@@ -1,0 +1,61 @@
+{
+  "timestamp": "20261001-122717",
+  "role": "agy3 (independent test executor)",
+  "git_base_head": "2d3ce17e01833677351226d99eacb189e2bdc746",
+  "dirty_product_files": [
+    "README.md",
+    "SKILL.md",
+    "hillclimb.py",
+    "install.md",
+    "tests/test_core.py"
+  ],
+  "exact_commands": {
+    "unittest": "python3 -m unittest -q > .hillclimb/codex-root-smoke-v2-20261001-122717/unittest.log 2>&1",
+    "dryrun": "python3 hillclimb.py --target .hillclimb/codex-root-smoke-v2-20261001-122717/inputs/target-prompt.md --eval .hillclimb/codex-root-smoke-v2-20261001-122717/inputs/evals.jsonl --runner pi --rounds 1 --limit 1 --repeats 1 --dry-run > .hillclimb/codex-root-smoke-v2-20261001-122717/dryrun.log 2>&1",
+    "real_smoke": "python3 -u hillclimb.py --target .hillclimb/codex-root-smoke-v2-20261001-122717/inputs/target-prompt.md --eval .hillclimb/codex-root-smoke-v2-20261001-122717/inputs/evals.jsonl --runner pi --rounds 1 --limit 1 --repeats 1 > .hillclimb/codex-root-smoke-v2-20261001-122717/smoke.log 2>&1"
+  },
+  "run_directory": ".hillclimb/20261001-122743",
+  "exit_codes": {
+    "unittest": 0,
+    "dryrun": 0,
+    "real_smoke": 0
+  },
+  "execution_metrics": {
+    "backend": "pi",
+    "baseline_train": 100.0,
+    "baseline_val": 100.0,
+    "preflight_facts": {
+      "noise_observed_val_variation": 0.0,
+      "headroom_warning": true,
+      "grader_disagreement": "0/3 (0.0%)",
+      "status": "PASSED"
+    },
+    "rounds_configured": 1,
+    "rounds_executed": 0,
+    "stop_reason": "NO_TRAIN_FAILURE_SIGNAL",
+    "final_comparison": {
+      "relationship": "Original == Best",
+      "original": 66.7,
+      "best": 66.7,
+      "delta": 0.0
+    },
+    "invocations_budget_upper_bound": 16,
+    "invocations_actual_by_path": 9,
+    "invocations_breakdown": {
+      "baseline": 4,
+      "preflight": 3,
+      "rounds": 0,
+      "final": 2
+    }
+  },
+  "artifacts_status": {
+    "candidate_files": null,
+    "stall_analysis_file": null,
+    "new_middleware": null
+  },
+  "snapshot_verification": {
+    "target_prompt_identical": true,
+    "evals_dataset_identical": true,
+    "tested_source_identical": true
+  }
+}

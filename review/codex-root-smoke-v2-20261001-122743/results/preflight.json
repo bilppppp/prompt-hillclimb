@@ -1,0 +1,20 @@
+{
+  "headroom": {
+    "train": 100.0,
+    "val": 100.0,
+    "warning": true
+  },
+  "noise": {
+    "baseline_val": 100.0,
+    "repeat_val": 100.0,
+    "delta": 0.0,
+    "warning": false
+  },
+  "grader_stability": {
+    "criteria_compared": 3,
+    "disagreements": 0,
+    "disagreement_rate": 0.0,
+    "warning": false
+  },
+  "status": "PASSED"
+}

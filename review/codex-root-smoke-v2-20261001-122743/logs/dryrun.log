@@ -1,0 +1,17 @@
+LIMITED SMOKE RUN — NOT A FULL EVALUATION
+
+Agent invocation estimate (upper bound):
+  Baseline: 4
+  Preflight: 3 (noise: 2, grader stability: 1)
+  Round 1: 5
+  Final blind comparison: up to 4 calls (evaluated for Original and Best; 1 run if unchanged)
+  Total: up to ~16
+
+[DRY RUN] All validation checks passed successfully.
+  Target prompt length: 1737 chars
+  Cases: 1 train, 1 val, 1 final
+  Runner executable: /Users/gravity/.nvm/versions/node/v24.16.0/bin/pi
+  Runner CLI isolation flags verified via help inspection.
+  .hillclimb write test succeeded.
+  Dry run complete. No models were invoked.
+DRYRUN_EXIT_CODE:0
