@@ -326,15 +326,24 @@ def estimate_model_calls(
 ) -> dict[str, int]:
     """Estimate total model invocation counts for the hillclimb run."""
     baseline_calls = (train_count + val_count) * repeats * 2
+    preflight_noise = 2 * val_count * repeats
+    preflight_grader = min(3, train_count * repeats)
+    preflight_calls = preflight_noise + preflight_grader
     round_calls = 1 + (train_count + val_count) * repeats * 2
-    final_calls = final_count * repeats * 2
-    total_calls = baseline_calls + (rounds * round_calls) + final_calls
+    rounds_total = rounds * round_calls
+    stall_calls = 1 if rounds >= 2 else 0
+    final_calls = 4 * final_count * repeats
+    total_calls = baseline_calls + preflight_calls + rounds_total + stall_calls + final_calls
 
     return {
         "baseline": baseline_calls,
+        "preflight": preflight_calls,
+        "preflight_noise": preflight_noise,
+        "preflight_grader": preflight_grader,
         "round_calls": round_calls,
         "rounds": rounds,
-        "rounds_total": rounds * round_calls,
+        "rounds_total": rounds_total,
+        "stall_categorizer": stall_calls,
         "final": final_calls,
         "total": total_calls,
     }
@@ -349,13 +358,20 @@ def estimate_noise_calls(train_count: int, val_count: int, repeats: int) -> dict
 
 def format_call_estimate(estimates: dict[str, int]) -> str:
     lines = [
-        "Estimated model calls:",
+        "Agent invocation estimate (upper bound):",
         f"  Baseline: {estimates['baseline']}",
+        f"  Preflight: {estimates['preflight']} (noise: {estimates['preflight_noise']}, grader stability: {estimates['preflight_grader']})",
     ]
     for r in range(1, estimates["rounds"] + 1):
         lines.append(f"  Round {r}: {estimates['round_calls']}")
-    lines.append(f"  Final: {estimates['final']}")
-    lines.append(f"  Total: ~{estimates['total']}")
+    if estimates["rounds"] >= 2:
+        lines.append(
+            f"  Stall categorizer: up to {estimates['stall_categorizer']} call (conditional if stalled after 2 reverts)"
+        )
+    lines.append(
+        f"  Final blind comparison: up to {estimates['final']} calls (evaluated for Original and Best; 1 run if unchanged)"
+    )
+    lines.append(f"  Total: up to ~{estimates['total']}")
     return "\n".join(lines)
 
 
@@ -641,24 +657,26 @@ def validate_candidate(
 
 
 def build_optimizer_prompt(best_prompt: str, train_failures: list[dict]) -> str:
-    """Construct prompt for optimizer LLM."""
-    failures_text = ""
+    """Construct prompt for optimizer LLM.
+
+    Defensively raises ValueError if train_failures is empty.
+    """
     if not train_failures:
-        failures_text = "当前 train 评测中所有标准均已通过。请聚焦于优化表达结构、消除冗余与提升通用泛化能力，避免破坏已有约束。"
-    else:
-        failure_blocks = []
-        for f in train_failures:
-            block = [
-                f"Case ID: {f.get('id', 'unknown')}",
-                f"Task: {f.get('input', '')}",
-                f"Response: {f.get('response', '')}",
-                "Failed Criteria:",
-            ]
-            for fc in f.get("failed_criteria", []):
-                block.append(f"  - Standard: {fc.get('criterion', '')}")
-                block.append(f"    Feedback: {fc.get('reason', '')}")
-            failure_blocks.append("\n".join(block))
-        failures_text = "\n\n---\n\n".join(failure_blocks)
+        raise ValueError("Cannot build optimizer prompt without train failures")
+
+    failure_blocks = []
+    for f in train_failures:
+        block = [
+            f"Case ID: {f.get('id', 'unknown')}",
+            f"Task: {f.get('input', '')}",
+            f"Response: {f.get('response', '')}",
+            "Failed Criteria:",
+        ]
+        for fc in f.get("failed_criteria", []):
+            block.append(f"  - Standard: {fc.get('criterion', '')}")
+            block.append(f"    Feedback: {fc.get('reason', '')}")
+        failure_blocks.append("\n".join(block))
+    failures_text = "\n\n---\n\n".join(failure_blocks)
 
     return (
         "直接根据下面提供的文本回答。\n"
@@ -694,9 +712,63 @@ def build_optimizer_prompt(best_prompt: str, train_failures: list[dict]) -> str:
 def run_optimizer(
     runner: str, best_prompt: str, train_failures: list[dict], timeout: int = 300
 ) -> str:
+    if not train_failures:
+        raise ValueError("Cannot run optimizer without train failures")
     prompt = build_optimizer_prompt(best_prompt, train_failures)
     raw_output = run_agent(runner, prompt, timeout=timeout)
     return extract_candidate_prompt(raw_output)
+
+
+def build_stall_categorizer_prompt(best_prompt: str, train_failures: list[dict]) -> str:
+    """Construct prompt for diagnostic categorizer when hillclimb stalls after consecutive reverts.
+
+    Strictly isolated: receives ONLY current best_prompt and corresponding train failures / feedback.
+    Never receives validation case details or final blind evaluation contents.
+    """
+    failure_blocks = []
+    for f in train_failures:
+        block = [
+            f"Case ID: {f.get('id', 'unknown')}",
+            f"Task: {f.get('input', '')}",
+            f"Response: {f.get('response', '')}",
+            "Failed Criteria:",
+        ]
+        for fc in f.get("failed_criteria", []):
+            block.append(f"  - Standard: {fc.get('criterion', '')}")
+            block.append(f"    Feedback: {fc.get('reason', '')}")
+        failure_blocks.append("\n".join(block))
+    failures_text = "\n\n---\n\n".join(failure_blocks) if failure_blocks else "无未解决的 train failure。"
+
+    return (
+        "直接根据下面提供的文本回答。\n"
+        "不要读取本地文件。\n"
+        "不要搜索目录。\n"
+        "不要使用任何工具。\n"
+        "不要尝试寻找额外上下文。\n\n"
+        "你是一个 Prompt 评测与优化诊断专家。\n"
+        "当前 Prompt 优化流程在连续两轮完整候选评估中均未能取得可接受的验证集提升，已触发停滞（Stall）。\n\n"
+        "【重要定位说明】\n"
+        "你当前仅执行只读诊断分析，并非 Optimizer。\n"
+        "严禁输出新的候选 Prompt（请勿使用 <<<PROMPT>>> 标记）。\n"
+        "本诊断不会自动修改评测标准、测试用例、数据集划分、Grader 或 Prompt，也不会自动重启优化循环。\n\n"
+        f"<current_best_prompt>\n{best_prompt.strip()}\n</current_best_prompt>\n\n"
+        f"<train_failures_and_feedback>\n{failures_text}\n</train_failures_and_feedback>\n\n"
+        "请分析导致连续无有效提升的可能原因，并在以下分类中指认主要因素（可指认多个，或标明 OTHER 并简述）：\n"
+        "- PROMPT_GAP: 现有 Prompt 仍缺少必要的指导逻辑或表达约束\n"
+        "- GRADER_ISSUE: Grader 判定过于严苛、存在矛盾或理由与标准不匹配\n"
+        "- AMBIGUOUS_EVAL: 任务要求或标准定义模糊，模型难以同时满足\n"
+        "- LIKELY_VARIANCE: 评估分数在微小噪声区间抖动，缺乏稳定提升空间\n"
+        "- OTHER: 其他外部或任务特定因素\n\n"
+        "请以 Markdown 格式输出诊断报告，包含对上述分类的归因分析以及面向开发者的建议（Recommendation）。"
+    )
+
+
+def run_stall_categorizer(
+    runner: str, best_prompt: str, train_failures: list[dict], timeout: int = 300
+) -> str:
+    """Execute diagnostic categorizer via existing run_agent subprocess."""
+    prompt = build_stall_categorizer_prompt(best_prompt, train_failures)
+    return run_agent(runner, prompt, timeout=timeout)
 
 
 def should_keep_candidate(
@@ -817,6 +889,149 @@ def collect_train_failures(cases: list[EvalCase], results: list[CaseExecutionRes
     return failures
 
 
+def run_preflight(
+    runner: str,
+    target_prompt: str,
+    baseline_train_score: float,
+    baseline_val_score: float,
+    baseline_train_results: list[CaseExecutionResult],
+    train_cases: list[EvalCase],
+    val_cases: list[EvalCase],
+    repeats: int,
+    min_gain: float,
+    timeout: int = 300,
+) -> tuple[bool, dict, str | None]:
+    """Run default lightweight preflight checks after baseline succeeds:
+
+    1. Headroom: Check if baseline train >= 95.0 AND baseline val >= 95.0 (0 calls, run first).
+    2. Noise: Re-run val split independently on original prompt with same repeats.
+    3. Grader stability: Re-grade up to 3 baseline train outputs (same response, no target call).
+
+    Returns: (success, preflight_data, error_message)
+    """
+    preflight_data: dict = {
+        "headroom": {},
+        "noise": {},
+        "grader_stability": {},
+    }
+
+    # 1. Headroom check (computed first to preserve baseline headroom evidence even if noise fails)
+    headroom_warn = (baseline_train_score >= 95.0) and (baseline_val_score >= 95.0)
+    preflight_data["headroom"] = {
+        "train": baseline_train_score,
+        "val": baseline_val_score,
+        "warning": headroom_warn,
+    }
+
+    # 2. Noise check
+    repeat_val_score, repeat_val_results, val_err = evaluate_split(
+        runner, target_prompt, val_cases, repeats, timeout=timeout
+    )
+    if val_err:
+        err_msg = f"Preflight noise measurement failed on val ({val_err['stage']}): {val_err['message']}"
+        preflight_data["noise"] = {
+            "baseline_val": baseline_val_score,
+            "error": val_err,
+            "results": [r.to_dict() for r in repeat_val_results],
+        }
+        preflight_data["status"] = "FAILED"
+        preflight_data["error"] = err_msg
+        return False, preflight_data, err_msg
+
+    val_delta = abs(repeat_val_score - baseline_val_score)
+    noise_warn = val_delta >= min_gain
+    preflight_data["noise"] = {
+        "baseline_val": baseline_val_score,
+        "repeat_val": repeat_val_score,
+        "delta": val_delta,
+        "warning": noise_warn,
+    }
+
+    # 3. Grader stability check
+    sample_count = min(3, len(baseline_train_results))
+    sample_results = baseline_train_results[:sample_count]
+    case_map = {c.id: c for c in train_cases}
+    criteria_compared = 0
+    disagreements = 0
+
+    for res in sample_results:
+        case = case_map.get(res.id)
+        crit_texts = case.criteria if case else []
+        try:
+            re_criteria = run_grader(
+                runner, res.input, crit_texts, res.response, timeout=timeout
+            )
+        except Exception as exc:
+            err_msg = f"Preflight grader stability check failed on case '{res.id}': {exc}"
+            preflight_data["grader_stability"] = {
+                "criteria_compared": criteria_compared,
+                "disagreements": disagreements,
+                "error": str(exc),
+                "case_id": res.id,
+                "repeat": res.repeat,
+                "response": res.response,
+            }
+            preflight_data["status"] = "FAILED"
+            preflight_data["error"] = err_msg
+            return False, preflight_data, err_msg
+
+        # Explicit validation before zip to avoid silent truncation or index mismatch
+        if len(re_criteria) != len(res.criteria):
+            err_msg = (
+                f"Preflight grader stability check failed on case '{res.id}': "
+                f"criterion count mismatch (expected {len(res.criteria)}, got {len(re_criteria)})"
+            )
+            preflight_data["grader_stability"] = {
+                "criteria_compared": criteria_compared,
+                "disagreements": disagreements,
+                "error": err_msg,
+                "case_id": res.id,
+                "repeat": res.repeat,
+                "expected_criteria_count": len(res.criteria),
+                "got_criteria_count": len(re_criteria),
+            }
+            preflight_data["status"] = "FAILED"
+            preflight_data["error"] = err_msg
+            return False, preflight_data, err_msg
+
+        for orig_c, new_c in zip(res.criteria, re_criteria):
+            if orig_c.index != new_c.index:
+                err_msg = (
+                    f"Preflight grader stability check failed on case '{res.id}': "
+                    f"criterion index mismatch (expected index {orig_c.index}, got {new_c.index})"
+                )
+                preflight_data["grader_stability"] = {
+                    "criteria_compared": criteria_compared,
+                    "disagreements": disagreements,
+                    "error": err_msg,
+                    "case_id": res.id,
+                    "repeat": res.repeat,
+                    "expected_index": orig_c.index,
+                    "got_index": new_c.index,
+                }
+                preflight_data["status"] = "FAILED"
+                preflight_data["error"] = err_msg
+                return False, preflight_data, err_msg
+
+            criteria_compared += 1
+            if orig_c.status != new_c.status:
+                disagreements += 1
+
+    disagreement_rate = (
+        (disagreements / criteria_compared * 100.0) if criteria_compared > 0 else 0.0
+    )
+    grader_warn = disagreements > 0
+    preflight_data["grader_stability"] = {
+        "criteria_compared": criteria_compared,
+        "disagreements": disagreements,
+        "disagreement_rate": disagreement_rate,
+        "warning": grader_warn,
+    }
+    preflight_data["status"] = "PASSED"
+
+    return True, preflight_data, None
+
+
 def run_noise_measurement(
     runner: str,
     target_prompt: str,
@@ -829,7 +1044,7 @@ def run_noise_measurement(
 ) -> int:
     """Run baseline twice independently and report/save observed val score delta."""
     estimates = estimate_noise_calls(len(train_cases), len(val_cases), repeats)
-    print("Estimated model calls (Noise Measurement):")
+    print("Agent invocation estimate (Noise Measurement):")
     print(f"  Run 1: {estimates['per_run']}")
     print(f"  Run 2: {estimates['per_run']}")
     print(f"  Total: ~{estimates['total']}\n")
@@ -856,7 +1071,7 @@ def run_noise_measurement(
             [
                 "# Baseline Noise Measurement",
                 "",
-                f"Runner: {runner}",
+                f"Execution backend: {runner}",
                 f"Repeats: {repeats}",
                 "Status: ABORT",
                 f"Reason: {stage_reason}",
@@ -936,7 +1151,7 @@ def run_noise_measurement(
     summary_file_content = []
     if limit is not None:
         summary_file_content.append("LIMITED SMOKE RUN — NOT A FULL EVALUATION\n")
-    summary_file_content.append(f"# Baseline Noise Measurement\n\nRunner: {runner}\nRepeats: {repeats}\n\n" + summary_text)
+    summary_file_content.append(f"# Baseline Noise Measurement\n\nExecution backend: {runner}\nRepeats: {repeats}\n\n" + summary_text)
     with open(os.path.join(run_dir, "summary.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(summary_file_content) + "\n")
 
@@ -1075,7 +1290,7 @@ def main() -> int:
     if args.dry_run:
         if args.measure_noise:
             noise_est = estimate_noise_calls(len(train_cases), len(val_cases), args.repeats)
-            print("Estimated model calls (Noise Measurement):")
+            print("Agent invocation estimate (Noise Measurement):")
             print(f"  Run 1: {noise_est['per_run']}")
             print(f"  Run 2: {noise_est['per_run']}")
             print(f"  Total: ~{noise_est['total']}")
@@ -1151,7 +1366,7 @@ def main() -> int:
     if train_err:
         summary_content = (
             f"# Prompt Hillclimb\n\n"
-            f"Runner: {args.runner}\n"
+            f"Execution backend: {args.runner}\n"
             f"Status: ABORT\n"
             f"Reason: Baseline train evaluation failed at stage '{train_err['stage']}': {train_err['message']}\n"
         )
@@ -1169,7 +1384,7 @@ def main() -> int:
     if val_err:
         summary_content = (
             f"# Prompt Hillclimb\n\n"
-            f"Runner: {args.runner}\n"
+            f"Execution backend: {args.runner}\n"
             f"Status: ABORT\n"
             f"Reason: Baseline val evaluation failed at stage '{val_err['stage']}': {val_err['message']}\n"
         )
@@ -1182,22 +1397,114 @@ def main() -> int:
 
     print(f"Baseline Train: {train_score:.1f}, Val: {val_score:.1f}")
 
+    # Step 2: Preflight
+    print("\n--- Running Preflight ---")
+    preflight_ok, preflight_data, preflight_err = run_preflight(
+        runner=args.runner,
+        target_prompt=target_prompt,
+        baseline_train_score=train_score,
+        baseline_val_score=val_score,
+        baseline_train_results=train_results,
+        train_cases=train_cases,
+        val_cases=val_cases,
+        repeats=args.repeats,
+        min_gain=args.min_gain,
+    )
+    with open(os.path.join(run_dir, "preflight.json"), "w", encoding="utf-8") as f:
+        json.dump(preflight_data, f, indent=2, ensure_ascii=False)
+
+    if not preflight_ok:
+        summary_lines = []
+        if args.limit is not None:
+            summary_lines.append("LIMITED SMOKE RUN — NOT A FULL EVALUATION\n")
+        summary_lines.extend(
+            [
+                "# Prompt Hillclimb",
+                "",
+                f"Execution backend: {args.runner}",
+                "Status: ABORT",
+                f"Reason: PREFLIGHT FAILED: {preflight_err}",
+                "",
+                "## Baseline",
+                "",
+                f"Train: {train_score:.1f}",
+                f"Val: {val_score:.1f}",
+                "",
+                "## Preflight Diagnostics",
+                "",
+                "Status: PREFLIGHT FAILED",
+                f"Headroom warning: {preflight_data.get('headroom', {}).get('warning', False)}",
+            ]
+        )
+        noise_info = preflight_data.get("noise", {})
+        if noise_info.get("error"):
+            summary_lines.append(f"Noise check: FAILED ({noise_info['error'].get('message', '')})")
+        elif "delta" in noise_info:
+            summary_lines.append(f"Noise delta: {noise_info['delta']:.1f}")
+
+        grader_info = preflight_data.get("grader_stability", {})
+        if grader_info.get("error"):
+            summary_lines.append(f"Grader stability: FAILED ({grader_info['error']})")
+        elif "disagreements" in grader_info:
+            summary_lines.append(
+                f"Grader disagreement: {grader_info['disagreements']}/{grader_info['criteria_compared']} ({grader_info['disagreement_rate']:.1f}%)"
+            )
+        summary_lines.append("")
+
+        summary_content = "\n".join(summary_lines)
+        with open(os.path.join(run_dir, "summary.md"), "w", encoding="utf-8") as f:
+            f.write(summary_content)
+
+        print(f"PREFLIGHT FAILED: {preflight_err}")
+        print(f"ABORT: Preflight failed: {preflight_err}")
+        print(f"PREFLIGHT FAILED: {preflight_err}", file=sys.stderr)
+        print(f"ABORT: Preflight failed: {preflight_err}", file=sys.stderr)
+        return 1
+
+    noise_info = preflight_data["noise"]
+    headroom_info = preflight_data["headroom"]
+    grader_info = preflight_data["grader_stability"]
+
+    if noise_info.get("warning"):
+        print(
+            f"PREFLIGHT WARNING: Observed validation variation ({noise_info['delta']:.1f}) is greater than or equal to --min-gain ({args.min_gain:.1f}). "
+            "Small candidate gains may not be distinguishable from evaluation noise."
+        )
+    if headroom_info.get("warning"):
+        print(
+            f"PREFLIGHT WARNING: Evaluation headroom is low (baseline train {headroom_info['train']:.1f} and val {headroom_info['val']:.1f} both >= 95%). "
+            "Optimization has limited upside."
+        )
+    if grader_info.get("warning"):
+        print(
+            f"PREFLIGHT WARNING: Grader produced inconsistent verdicts on identical responses "
+            f"({grader_info['disagreements']}/{grader_info['criteria_compared']} criteria disagreements, {grader_info['disagreement_rate']:.1f}%)."
+        )
+
     best_prompt = target_prompt
     best_train_score = train_score
     best_val_score = val_score
     latest_train_results = train_results
 
     round_summaries: list[dict] = []
+    consecutive_reverts = 0
+    stop_reason: str | None = None
+    rounds_executed = 0
 
-    # Step 2: Hillclimb Rounds
+    # Step 3: Hillclimb Rounds
     for r in range(1, args.rounds + 1):
+        train_failures = collect_train_failures(train_cases, latest_train_results)
+        if not train_failures:
+            print(f"\nNo train failures detected before Round {r}. Stopping optimization.")
+            stop_reason = "NO_TRAIN_FAILURE_SIGNAL"
+            break
+
+        rounds_executed += 1
         round_name = f"round-{r:02d}"
         round_dir = os.path.join(run_dir, round_name)
         os.makedirs(round_dir, exist_ok=True)
 
         print(f"\n--- Round {r} ---")
-        train_failures = collect_train_failures(train_cases, latest_train_results)
-
         round_info: dict = {"round": r, "status": "OK", "decision": "REVERT"}
 
         try:
@@ -1207,6 +1514,7 @@ def main() -> int:
             round_info["status"] = "INVALID"
             round_info["reason"] = f"optimizer error: {exc}"
             round_info["decision"] = "REVERT"
+            consecutive_reverts = 0
             round_summaries.append(round_info)
             continue
 
@@ -1221,6 +1529,7 @@ def main() -> int:
             round_info["status"] = "INVALID"
             round_info["reason"] = val_reason
             round_info["decision"] = "REVERT"
+            consecutive_reverts = 0
             round_summaries.append(round_info)
             continue
 
@@ -1233,6 +1542,7 @@ def main() -> int:
             round_info["status"] = "INVALID"
             round_info["reason"] = f"candidate train error ({cand_train_err['stage']}): {cand_train_err['message']}"
             round_info["decision"] = "REVERT"
+            consecutive_reverts = 0
             round_summaries.append(round_info)
             continue
 
@@ -1245,6 +1555,7 @@ def main() -> int:
             round_info["status"] = "INVALID"
             round_info["reason"] = f"candidate val error ({cand_val_err['stage']}): {cand_val_err['message']}"
             round_info["decision"] = "REVERT"
+            consecutive_reverts = 0
             round_summaries.append(round_info)
             continue
 
@@ -1264,36 +1575,114 @@ def main() -> int:
             best_train_score = cand_train_score
             best_val_score = cand_val_score
             latest_train_results = cand_train_results
+            consecutive_reverts = 0
         else:
             print(
                 f"Round {r} REVERT: Train {cand_train_score:.1f}, Val {cand_val_score:.1f} (Gain: {gain:+.1f})"
             )
             round_info["decision"] = "REVERT"
+            consecutive_reverts += 1
 
         round_summaries.append(round_info)
 
-    # Step 3: Save Best Prompt
+        if consecutive_reverts >= 2:
+            print(f"\nStall detected after 2 consecutive reverts in Round {r}.")
+            stop_reason = "STALLED_AFTER_2_REVERTS"
+            stall_failures = collect_train_failures(train_cases, latest_train_results)
+            try:
+               analysis_text = run_stall_categorizer(
+                   args.runner, best_prompt, stall_failures
+               )
+            except Exception as exc:
+               print(f"Warning: Stall categorizer failed: {exc}", file=sys.stderr)
+               analysis_text = f"# Stall Analysis\n\nCategorizer execution failed: {exc}\n"
+
+            with open(os.path.join(run_dir, "stall-analysis.md"), "w", encoding="utf-8") as f:
+               f.write(analysis_text)
+            break
+
+    # Step 4: Save Best Prompt
     with open(os.path.join(run_dir, "best-prompt.md"), "w", encoding="utf-8") as f:
         f.write(best_prompt)
 
-    # Step 4: Final Evaluation (Run exactly once on best prompt)
-    print("\n--- Running Final Evaluation ---")
+    # Step 5: Final Blind Comparison
+    print("\n--- Running Final Blind Comparison ---")
     final_dir = os.path.join(run_dir, "final")
     os.makedirs(final_dir, exist_ok=True)
 
-    final_score, final_results, final_err = evaluate_split(
-        args.runner, best_prompt, final_cases, args.repeats
-    )
-    save_jsonl_results(os.path.join(final_dir, "final.jsonl"), final_results)
-    if final_err:
-        print(f"Error: Final evaluation failed at stage '{final_err['stage']}': {final_err['message']}", file=sys.stderr)
-        final_score_str = f"FAILED ({final_err['stage']}: {final_err['message']})"
+    final_failed = False
+    orig_final_score_str = ""
+    best_final_score_str = ""
+    delta_str = ""
+
+    if best_prompt == target_prompt:
+        print("Original == Best")
+        orig_score, orig_results, orig_err = evaluate_split(
+            args.runner, target_prompt, final_cases, args.repeats
+        )
+        save_jsonl_results(os.path.join(final_dir, "original.jsonl"), orig_results)
+        if orig_err:
+            final_failed = True
+            orig_final_score_str = f"FAILED ({orig_err['stage']}: {orig_err['message']})"
+            best_final_score_str = f"FAILED ({orig_err['stage']}: {orig_err['message']}) (shared with Original)"
+            delta_str = "FAILED"
+            print(
+                f"Error: Final evaluation failed on Original: {orig_err['message']}",
+                file=sys.stderr,
+            )
+        else:
+            orig_final_score_str = f"{orig_score:.1f}"
+            best_final_score_str = f"{orig_score:.1f} (shared with Original)"
+            delta_str = "0.0 (no accepted prompt change)"
     else:
-        final_score_str = f"{final_score:.1f}"
+        orig_score, orig_results, orig_err = evaluate_split(
+            args.runner, target_prompt, final_cases, args.repeats
+        )
+        save_jsonl_results(os.path.join(final_dir, "original.jsonl"), orig_results)
 
-    print(f"Final Score: {final_score_str}")
+        best_score, best_results, best_err = evaluate_split(
+            args.runner, best_prompt, final_cases, args.repeats
+        )
+        save_jsonl_results(os.path.join(final_dir, "best.jsonl"), best_results)
 
-    # Step 5: Generate summary.md
+        if orig_err or best_err:
+            final_failed = True
+            orig_final_score_str = (
+                f"FAILED ({orig_err['stage']}: {orig_err['message']})"
+                if orig_err
+                else f"{orig_score:.1f}"
+            )
+            best_final_score_str = (
+                f"FAILED ({best_err['stage']}: {best_err['message']})"
+                if best_err
+                else f"{best_score:.1f}"
+            )
+            delta_str = "FAILED"
+            if orig_err:
+                print(
+                    f"Error: Final evaluation failed on Original: {orig_err['message']}",
+                    file=sys.stderr,
+                )
+            if best_err:
+                print(
+                    f"Error: Final evaluation failed on Best: {best_err['message']}",
+                    file=sys.stderr,
+                )
+        else:
+            delta = best_score - orig_score
+            orig_final_score_str = f"{orig_score:.1f}"
+            best_final_score_str = f"{best_score:.1f}"
+            delta_str = f"{delta:+.1f}"
+
+    if final_failed:
+        print("Final comparison: FAILED")
+        print("Final comparison: FAILED", file=sys.stderr)
+    else:
+        print(
+            f"Final Blind Comparison: Original={orig_final_score_str}, Best={best_final_score_str}, Delta={delta_str}"
+        )
+
+    # Step 6: Generate summary.md
     summary_lines = []
     if args.limit is not None:
         summary_lines.append("LIMITED SMOKE RUN — NOT A FULL EVALUATION\n")
@@ -1302,8 +1691,16 @@ def main() -> int:
         [
             "# Prompt Hillclimb",
             "",
-            f"Runner: {args.runner}",
-            f"Rounds attempted: {args.rounds}",
+            f"Execution backend: {args.runner}",
+            f"Rounds configured: {args.rounds}",
+            f"Rounds executed: {rounds_executed}",
+        ]
+    )
+    if stop_reason:
+        summary_lines.append(f"Stop reason: {stop_reason}")
+
+    summary_lines.extend(
+        [
             f"Repeats: {args.repeats}",
             f"Min gain: {args.min_gain}",
             "",
@@ -1311,6 +1708,27 @@ def main() -> int:
             "",
             f"Train: {train_score:.1f}",
             f"Val: {val_score:.1f}",
+            "",
+            "## Preflight",
+            "",
+            f"Observed val variation: {noise_info['delta']:.1f}"
+            + (
+                " (warning: observed validation variation is greater than or equal to --min-gain; small candidate gains may not be distinguishable from evaluation noise)"
+                if noise_info.get("warning")
+                else ""
+            ),
+            f"Headroom warning: {headroom_info.get('warning', False)}"
+            + (
+                " (warning: evaluation headroom is low; baseline train and val both >= 95%)"
+                if headroom_info.get("warning")
+                else ""
+            ),
+            f"Grader disagreement: {grader_info['disagreements']}/{grader_info['criteria_compared']} ({grader_info['disagreement_rate']:.1f}%)"
+            + (
+                " (warning: grader produced inconsistent verdicts on identical responses)"
+                if grader_info.get("warning")
+                else ""
+            ),
             "",
         ]
     )
@@ -1337,15 +1755,28 @@ def main() -> int:
             f"Train: {best_train_score:.1f}",
             f"Val: {best_val_score:.1f}",
             "",
-            "## Final",
+            "## Final Blind Comparison",
             "",
-            f"Final: {final_score_str}",
+        ]
+    )
+    if best_prompt == target_prompt:
+        summary_lines.append("Original == Best")
+    if final_failed:
+        summary_lines.append("Final comparison: FAILED")
+    summary_lines.extend(
+        [
+            f"Original: {orig_final_score_str}",
+            f"Best: {best_final_score_str}",
+            f"Delta: {delta_str}",
             "",
             "Best prompt:",
             "best-prompt.md",
             "",
         ]
     )
+    if stop_reason == "STALLED_AFTER_2_REVERTS":
+        summary_lines.append("Stall analysis:")
+        summary_lines.append("stall-analysis.md\n")
 
     summary_content = "\n".join(summary_lines)
     with open(os.path.join(run_dir, "summary.md"), "w", encoding="utf-8") as f:
@@ -1355,7 +1786,7 @@ def main() -> int:
     print(f"Outputs written to: {run_dir}")
 
     # Return non-zero if final evaluation failed
-    if final_err is not None:
+    if final_failed:
         return 1
 
     return 0

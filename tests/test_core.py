@@ -23,6 +23,7 @@ from hillclimb import (
     OptimizerMarkerError,
     build_grader_prompt,
     build_optimizer_prompt,
+    build_stall_categorizer_prompt,
     build_target_prompt,
     compute_split_score,
     create_unique_run_dir,
@@ -35,6 +36,10 @@ from hillclimb import (
     load_eval_cases,
     parse_grader_output,
     run_agent,
+    run_grader,
+    run_optimizer,
+    run_preflight,
+    run_stall_categorizer,
     should_keep_candidate,
     validate_candidate,
     validate_run_parameters,
@@ -425,16 +430,29 @@ class TestDecisionAndScoring(unittest.TestCase):
 class TestCallEstimation(unittest.TestCase):
     def test_estimation_formula(self):
         est = estimate_model_calls(train_count=4, val_count=2, final_count=2, rounds=3, repeats=1)
+        # baseline: (4 + 2) * 1 * 2 = 12
         self.assertEqual(est["baseline"], 12)
+        # preflight: noise (2 * 2 * 1 = 4) + grader (min(3, 4 * 1) = 3) = 7
+        self.assertEqual(est["preflight_noise"], 4)
+        self.assertEqual(est["preflight_grader"], 3)
+        self.assertEqual(est["preflight"], 7)
+        # round_calls: 1 + (4 + 2) * 1 * 2 = 13
         self.assertEqual(est["round_calls"], 13)
         self.assertEqual(est["rounds_total"], 39)
-        self.assertEqual(est["final"], 4)
-        self.assertEqual(est["total"], 55)
+        # stall_categorizer: rounds >= 2 -> 1
+        self.assertEqual(est["stall_categorizer"], 1)
+        # final: 4 * 2 * 1 = 8
+        self.assertEqual(est["final"], 8)
+        # total: 12 + 7 + 39 + 1 + 8 = 67
+        self.assertEqual(est["total"], 67)
 
     def test_noise_estimation_formula(self):
         est = estimate_noise_calls(train_count=4, val_count=2, repeats=1)
         self.assertEqual(est["per_run"], 12)
         self.assertEqual(est["total"], 24)
+        # Verify noise estimation does NOT mix in preflight or double final
+        self.assertNotIn("preflight", est)
+        self.assertNotIn("stall_categorizer", est)
 
 
 class TestSubprocessAndIsolation(unittest.TestCase):
@@ -500,8 +518,21 @@ class TestSubprocessAndIsolation(unittest.TestCase):
         grader_p = build_grader_prompt("Task", ["Criterion 1"], "Response")
         self.assertIn("不要尝试寻找额外上下文。", grader_p)
 
-        opt_p = build_optimizer_prompt("Best prompt", [])
+        dummy_failures = [
+            {
+                "id": "c1",
+                "input": "Task",
+                "response": "Ans",
+                "failed_criteria": [{"index": 1, "criterion": "c1", "reason": "failed"}],
+            }
+        ]
+        opt_p = build_optimizer_prompt("Best prompt", dummy_failures)
         self.assertIn("不要尝试寻找额外上下文。", opt_p)
+
+        stall_p = build_stall_categorizer_prompt("Best prompt", dummy_failures)
+        self.assertIn("不要读取本地文件。", stall_p)
+        self.assertIn("不要使用任何工具。", stall_p)
+        self.assertIn("不要尝试寻找额外上下文。", stall_p)
 
     @patch("hillclimb.run_target")
     @patch("hillclimb.run_grader")
@@ -572,12 +603,14 @@ class TestMainWorkflowControl(unittest.TestCase):
     @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
     @patch("hillclimb.verify_runner_cli_flags")
     @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
     @patch("hillclimb.run_optimizer")
     @patch("hillclimb.evaluate_split")
     def test_candidate_error_marks_invalid_and_runs_final_once(
-        self, mock_eval_split, mock_opt, mock_writable, mock_flags, mock_exec
+        self, mock_eval_split, mock_opt, mock_grader, mock_writable, mock_flags, mock_exec
     ):
         mock_opt.return_value = "Candidate prompt"
+        mock_grader.return_value = [CriterionResult(index=1, status="FAIL", reason="Need hint")]
 
         final_call_count = 0
 
@@ -588,12 +621,12 @@ class TestMainWorkflowControl(unittest.TestCase):
                 if prompt == "Candidate prompt":
                     err = {"stage": "target", "type": "RuntimeError", "message": "Candidate target crashed"}
                     return 0.0, [CaseExecutionResult(id=cases[0].id, repeat=1, error=err)], err
-                return 100.0, [CaseExecutionResult(id=cases[0].id, repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                return 50.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="FAIL", reason="Need hint")])], None
             elif split == "val":
-                return 100.0, [CaseExecutionResult(id=cases[0].id, repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                return 100.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="PASS")])], None
             elif split == "final":
                 final_call_count += 1
-                return 100.0, [CaseExecutionResult(id=cases[0].id, repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                return 100.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="PASS")])], None
             return 0.0, [], None
 
         mock_eval_split.side_effect = fake_eval_split
@@ -658,6 +691,916 @@ class TestMainWorkflowControl(unittest.TestCase):
             summary = f.read()
 
         self.assertIn("Status: ABORT", summary)
+
+
+class TestPreflightLogic(unittest.TestCase):
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_noise_and_headroom_warnings(self, mock_eval, mock_grader):
+        mock_eval.return_value = (90.0, [], None)
+        mock_grader.return_value = [CriterionResult(index=1, status="PASS")]
+
+        train_cases = [EvalCase(id="c1", split="train", input="2+2=?", criteria=["correct"])]
+        val_cases = [EvalCase(id="v1", split="val", input="3+3=?", criteria=["correct"])]
+        baseline_train_results = [
+            CaseExecutionResult(
+                id="c1",
+                repeat=1,
+                input="2+2=?",
+                response="4",
+                criteria=[CriterionResult(index=1, status="PASS")],
+            )
+        ]
+
+        ok, data, err = run_preflight(
+            runner="codex",
+            target_prompt="Prompt",
+            baseline_train_score=96.0,
+            baseline_val_score=96.0,
+            baseline_train_results=baseline_train_results,
+            train_cases=train_cases,
+            val_cases=val_cases,
+            repeats=1,
+            min_gain=3.0,
+        )
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+        self.assertTrue(data["noise"]["warning"])
+        self.assertEqual(data["noise"]["delta"], 6.0)
+        self.assertTrue(data["headroom"]["warning"])
+        self.assertFalse(data["grader_stability"]["warning"])
+        self.assertEqual(data["grader_stability"]["disagreements"], 0)
+
+    @patch("hillclimb.run_target")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_grader_stability_disagreements(self, mock_eval, mock_grader, mock_target):
+        mock_eval.return_value = (80.0, [], None)
+        mock_grader.return_value = [CriterionResult(index=1, status="FAIL")]
+
+        train_cases = [EvalCase(id="c1", split="train", input="2+2=?", criteria=["correct"])]
+        val_cases = [EvalCase(id="v1", split="val", input="3+3=?", criteria=["correct"])]
+        baseline_train_results = [
+            CaseExecutionResult(
+                id="c1",
+                repeat=1,
+                input="2+2=?",
+                response="4",
+                criteria=[CriterionResult(index=1, status="PASS")],
+            )
+        ]
+
+        ok, data, err = run_preflight(
+            runner="codex",
+            target_prompt="Prompt",
+            baseline_train_score=80.0,
+            baseline_val_score=80.0,
+            baseline_train_results=baseline_train_results,
+            train_cases=train_cases,
+            val_cases=val_cases,
+            repeats=1,
+            min_gain=3.0,
+        )
+        self.assertTrue(ok)
+        self.assertTrue(data["grader_stability"]["warning"])
+        self.assertEqual(data["grader_stability"]["criteria_compared"], 1)
+        self.assertEqual(data["grader_stability"]["disagreements"], 1)
+        self.assertEqual(data["grader_stability"]["disagreement_rate"], 100.0)
+        mock_target.assert_not_called()
+
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_noise_and_headroom_boundary_subtests(self, mock_eval, mock_grader):
+        mock_grader.return_value = []
+        # Test noise boundary with subTest
+        noise_cases = [
+            # (baseline_val, repeat_val, min_gain, expected_warn, desc)
+            (80.0, 83.0, 3.0, True, "delta == min_gain (3.0 == 3.0) should warn"),
+            (80.0, 77.0, 3.0, True, "negative delta abs == min_gain should warn"),
+            (80.0, 82.9, 3.0, False, "delta slightly below min_gain (2.9 < 3.0) should not warn"),
+            (80.0, 77.1, 3.0, False, "negative delta slightly below min_gain should not warn"),
+        ]
+        for base_val, rep_val, mg, exp_warn, desc in noise_cases:
+            with self.subTest(msg=desc, base=base_val, rep=rep_val):
+                mock_eval.return_value = (rep_val, [], None)
+                ok, data, _ = run_preflight(
+                    runner="codex",
+                    target_prompt="Prompt",
+                    baseline_train_score=80.0,
+                    baseline_val_score=base_val,
+                    baseline_train_results=[],
+                    train_cases=[],
+                    val_cases=[],
+                    repeats=1,
+                    min_gain=mg,
+                )
+                self.assertTrue(ok)
+                self.assertEqual(data["noise"]["warning"], exp_warn)
+
+        # Test headroom boundary with subTest
+        headroom_cases = [
+            (95.0, 95.0, True, "(95.0, 95.0) both >= 95 should warn"),
+            (100.0, 95.0, True, "(100.0, 95.0) both >= 95 should warn"),
+            (95.0, 100.0, True, "(95.0, 100.0) both >= 95 should warn"),
+            (94.9, 95.0, False, "(94.9, 95.0) train < 95 should not warn"),
+            (95.0, 94.9, False, "(95.0, 94.9) val < 95 should not warn"),
+            (94.9, 94.9, False, "(94.9, 94.9) both < 95 should not warn"),
+        ]
+        mock_eval.return_value = (80.0, [], None)
+        for tr_score, val_score, exp_warn, desc in headroom_cases:
+            with self.subTest(msg=desc, tr=tr_score, val=val_score):
+                ok, data, _ = run_preflight(
+                    runner="codex",
+                    target_prompt="Prompt",
+                    baseline_train_score=tr_score,
+                    baseline_val_score=val_score,
+                    baseline_train_results=[],
+                    train_cases=[],
+                    val_cases=[],
+                    repeats=1,
+                    min_gain=3.0,
+                )
+                self.assertTrue(ok)
+                self.assertEqual(data["headroom"]["warning"], exp_warn)
+
+    @patch("hillclimb.run_target")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_grader_stability_samples_at_most_3_results(self, mock_eval, mock_grader, mock_target):
+        mock_eval.return_value = (80.0, [], None)
+        mock_grader.return_value = [CriterionResult(index=1, status="PASS")]
+
+        train_cases = [
+            EvalCase(id=f"c{i}", split="train", input=f"input_{i}", criteria=[f"crit_{i}"])
+            for i in range(1, 6)
+        ]
+        baseline_train_results = [
+            CaseExecutionResult(
+                id=f"c{i}",
+                repeat=1,
+                input=f"input_{i}",
+                response=f"response_{i}",
+                criteria=[CriterionResult(index=1, status="PASS")],
+            )
+            for i in range(1, 6)
+        ]
+
+        ok, data, err = run_preflight(
+            runner="codex",
+            target_prompt="Prompt",
+            baseline_train_score=80.0,
+            baseline_val_score=80.0,
+            baseline_train_results=baseline_train_results,
+            train_cases=train_cases,
+            val_cases=[],
+            repeats=1,
+            min_gain=3.0,
+        )
+        self.assertTrue(ok)
+        self.assertEqual(mock_grader.call_count, 3)
+        mock_target.assert_not_called()
+        # Verify the 3 calls received the exact task/criteria/response from the first 3 results
+        for idx, call_args in enumerate(mock_grader.call_args_list):
+            c_args, _ = call_args
+            self.assertEqual(c_args[1], f"input_{idx+1}")
+            self.assertEqual(c_args[2], [f"crit_{idx+1}"])
+            self.assertEqual(c_args[3], f"response_{idx+1}")
+
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_noise_val_failure_aborts(self, mock_eval):
+        val_err = {"stage": "target", "type": "RuntimeError", "message": "Val crashed"}
+        failed_case_res = CaseExecutionResult(
+            id="v1",
+            repeat=1,
+            input="3+3=?",
+            response=None,
+            error=val_err,
+        )
+        mock_eval.return_value = (0.0, [failed_case_res], val_err)
+
+        ok, data, err = run_preflight(
+            runner="codex",
+            target_prompt="Prompt",
+            baseline_train_score=80.0,
+            baseline_val_score=80.0,
+            baseline_train_results=[],
+            train_cases=[],
+            val_cases=[EvalCase(id="v1", split="val", input="3+3=?", criteria=["correct"])],
+            repeats=1,
+            min_gain=3.0,
+        )
+        self.assertFalse(ok)
+        self.assertEqual(data["status"], "FAILED")
+        self.assertIn("Val crashed", err)
+        # Verify headroom evidence is preserved before noise check
+        self.assertEqual(data["headroom"]["train"], 80.0)
+        self.assertEqual(data["headroom"]["val"], 80.0)
+        self.assertFalse(data["headroom"]["warning"])
+        # Verify case-level results are recorded in noise failure data
+        self.assertEqual(len(data["noise"]["results"]), 1)
+        self.assertEqual(data["noise"]["results"][0]["id"], "v1")
+        self.assertEqual(data["noise"]["results"][0]["error"]["message"], "Val crashed")
+
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_grader_stability_failure_aborts(self, mock_eval, mock_grader):
+        mock_eval.return_value = (80.0, [], None)
+        mock_grader.side_effect = GraderParseError("Unparseable output")
+
+        train_cases = [EvalCase(id="c1", split="train", input="2+2=?", criteria=["correct"])]
+        val_cases = [EvalCase(id="v1", split="val", input="3+3=?", criteria=["correct"])]
+        baseline_train_results = [
+            CaseExecutionResult(
+                id="c1",
+                repeat=1,
+                input="2+2=?",
+                response="4",
+                criteria=[CriterionResult(index=1, status="PASS")],
+            )
+        ]
+
+        ok, data, err = run_preflight(
+            runner="codex",
+            target_prompt="Prompt",
+            baseline_train_score=80.0,
+            baseline_val_score=80.0,
+            baseline_train_results=baseline_train_results,
+            train_cases=train_cases,
+            val_cases=val_cases,
+            repeats=1,
+            min_gain=3.0,
+        )
+        self.assertFalse(ok)
+        self.assertEqual(data["status"], "FAILED")
+        self.assertIn("Unparseable output", err)
+        self.assertEqual(data["grader_stability"]["case_id"], "c1")
+        self.assertEqual(data["grader_stability"]["response"], "4")
+
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_grader_stability_count_mismatch_aborts(self, mock_eval, mock_grader):
+        mock_eval.return_value = (80.0, [], None)
+        # Original had 1 criterion, but grader returns 2 criteria
+        mock_grader.return_value = [
+            CriterionResult(index=1, status="PASS"),
+            CriterionResult(index=2, status="PASS"),
+        ]
+
+        train_cases = [EvalCase(id="c1", split="train", input="2+2=?", criteria=["correct"])]
+        val_cases = [EvalCase(id="v1", split="val", input="3+3=?", criteria=["correct"])]
+        baseline_train_results = [
+            CaseExecutionResult(
+                id="c1",
+                repeat=1,
+                input="2+2=?",
+                response="4",
+                criteria=[CriterionResult(index=1, status="PASS")],
+            )
+        ]
+
+        ok, data, err = run_preflight(
+            runner="codex",
+            target_prompt="Prompt",
+            baseline_train_score=80.0,
+            baseline_val_score=80.0,
+            baseline_train_results=baseline_train_results,
+            train_cases=train_cases,
+            val_cases=val_cases,
+            repeats=1,
+            min_gain=3.0,
+        )
+        self.assertFalse(ok)
+        self.assertEqual(data["status"], "FAILED")
+        self.assertIn("criterion count mismatch", err)
+        self.assertEqual(data["grader_stability"]["expected_criteria_count"], 1)
+        self.assertEqual(data["grader_stability"]["got_criteria_count"], 2)
+        self.assertEqual(data["grader_stability"]["case_id"], "c1")
+
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_grader_stability_index_mismatch_aborts(self, mock_eval, mock_grader):
+        mock_eval.return_value = (80.0, [], None)
+        # Original had index 1, but grader returns index 2
+        mock_grader.return_value = [CriterionResult(index=2, status="PASS")]
+
+        train_cases = [EvalCase(id="c1", split="train", input="2+2=?", criteria=["correct"])]
+        val_cases = [EvalCase(id="v1", split="val", input="3+3=?", criteria=["correct"])]
+        baseline_train_results = [
+            CaseExecutionResult(
+                id="c1",
+                repeat=1,
+                input="2+2=?",
+                response="4",
+                criteria=[CriterionResult(index=1, status="PASS")],
+            )
+        ]
+
+        ok, data, err = run_preflight(
+            runner="codex",
+            target_prompt="Prompt",
+            baseline_train_score=80.0,
+            baseline_val_score=80.0,
+            baseline_train_results=baseline_train_results,
+            train_cases=train_cases,
+            val_cases=val_cases,
+            repeats=1,
+            min_gain=3.0,
+        )
+        self.assertFalse(ok)
+        self.assertEqual(data["status"], "FAILED")
+        self.assertIn("criterion index mismatch", err)
+        self.assertEqual(data["grader_stability"]["expected_index"], 1)
+        self.assertEqual(data["grader_stability"]["got_index"], 2)
+        self.assertEqual(data["grader_stability"]["case_id"], "c1")
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.run_preflight")
+    @patch("hillclimb.evaluate_split")
+    def test_preflight_abort_in_main_writes_diagnostic_summary_and_stops(
+        self, mock_eval_split, mock_preflight, mock_opt, mock_writable, mock_flags, mock_exec
+    ):
+        mock_eval_split.return_value = (80.0, [], None)
+        preflight_err = "Preflight noise measurement failed on val (target): Val timeout"
+        mock_preflight.return_value = (
+            False,
+            {
+                "status": "FAILED",
+                "headroom": {"train": 80.0, "val": 80.0, "warning": False},
+                "noise": {"error": {"stage": "target", "message": "Val timeout"}},
+                "grader_stability": {},
+            },
+            preflight_err,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            prompt_path = os.path.join(tmp_dir, "target.md")
+            with open(prompt_path, "w", encoding="utf-8") as f:
+                f.write("Initial prompt.")
+
+            eval_path = os.path.join(tmp_dir, "evals.jsonl")
+            cases = [
+                '{"id": "t1", "split": "train", "input": "train task", "criteria": ["crit1"]}',
+                '{"id": "v1", "split": "val", "input": "val task", "criteria": ["crit1"]}',
+                '{"id": "f1", "split": "final", "input": "final task", "criteria": ["crit1"]}',
+            ]
+            with open(eval_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(cases) + "\n")
+
+            test_run_dir = os.path.join(tmp_dir, "run_preflight_abort")
+            os.makedirs(test_run_dir, exist_ok=True)
+            with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+                with patch("sys.argv", ["hillclimb.py", "--target", prompt_path, "--eval", eval_path, "--runner", "codex", "--rounds", "3"]):
+                    exit_code = main()
+
+            self.assertEqual(exit_code, 1)
+            # Verify optimizer was never invoked
+            mock_opt.assert_not_called()
+            # Verify final evaluation was never invoked and final dir does not exist
+            self.assertFalse(os.path.exists(os.path.join(test_run_dir, "final")))
+            for call_item in mock_eval_split.call_args_list:
+                cases_arg = call_item[0][2]
+                self.assertNotEqual(cases_arg[0].split, "final")
+
+            summary_path = os.path.join(test_run_dir, "summary.md")
+            with open(summary_path, "r", encoding="utf-8") as f:
+                summary = f.read()
+
+            self.assertIn("Execution backend: codex", summary)
+            self.assertIn("Status: ABORT", summary)
+            self.assertIn("Reason: PREFLIGHT FAILED: " + preflight_err, summary)
+            self.assertIn("## Preflight Diagnostics", summary)
+            self.assertIn("Headroom warning: False", summary)
+            self.assertIn("Noise check: FAILED (Val timeout)", summary)
+            self.assertNotIn("## Round 1", summary)
+
+
+class TestNoTrainFailures(unittest.TestCase):
+    def test_optimizer_defensive_value_error_on_empty_failures(self):
+        with self.assertRaises(ValueError) as ctx1:
+            build_optimizer_prompt("Prompt", [])
+        self.assertIn("Cannot build optimizer prompt without train failures", str(ctx1.exception))
+
+        with self.assertRaises(ValueError) as ctx2:
+            run_optimizer("codex", "Prompt", [])
+        self.assertIn("Cannot run optimizer without train failures", str(ctx2.exception))
+
+    def setUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.prompt_path = os.path.join(self.tmp_dir.name, "target.md")
+        with open(self.prompt_path, "w", encoding="utf-8") as f:
+            f.write("Initial prompt for the math tutor agent to explain concepts clearly.")
+
+        self.eval_path = os.path.join(self.tmp_dir.name, "evals.jsonl")
+        cases = [
+            '{"id": "t1", "split": "train", "input": "train task", "criteria": ["crit1"]}',
+            '{"id": "v1", "split": "val", "input": "val task", "criteria": ["crit1"]}',
+            '{"id": "f1", "split": "final", "input": "final task", "criteria": ["crit1"]}',
+        ]
+        with open(self.eval_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(cases) + "\n")
+
+    def tearDown(self):
+        self.tmp_dir.cleanup()
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.evaluate_split")
+    def test_baseline_perfect_score_stops_before_round_1(
+        self, mock_eval_split, mock_opt, mock_grader, mock_writable, mock_flags, mock_exec
+    ):
+        mock_grader.return_value = [CriterionResult(index=1, status="PASS")]
+        mock_eval_split.return_value = (
+            100.0,
+            [CaseExecutionResult(id="t1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])],
+            None,
+        )
+
+        test_run_dir = os.path.join(self.tmp_dir.name, "run_perfect_baseline")
+        os.makedirs(test_run_dir, exist_ok=True)
+        with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+            with patch("sys.argv", ["hillclimb.py", "--target", self.prompt_path, "--eval", self.eval_path, "--runner", "codex", "--rounds", "3"]):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        mock_opt.assert_not_called()
+
+        self.assertFalse(os.path.exists(os.path.join(test_run_dir, "round-01")))
+
+        summary_path = os.path.join(test_run_dir, "summary.md")
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = f.read()
+
+        self.assertIn("Rounds configured: 3", summary)
+        self.assertIn("Rounds executed: 0", summary)
+        self.assertIn("Stop reason: NO_TRAIN_FAILURE_SIGNAL", summary)
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.evaluate_split")
+    def test_keep_achieving_full_train_pass_stops_before_next_round_without_optimizer(
+        self, mock_eval_split, mock_opt, mock_grader, mock_writable, mock_flags, mock_exec
+    ):
+        mock_grader.return_value = [CriterionResult(index=1, status="FAIL")]
+        mock_opt.return_value = "Optimized prompt for tutor agent to explain concepts clearly."
+
+        def fake_eval_split(runner, prompt, cases, repeats, timeout=300):
+            split = cases[0].split
+            if split == "train":
+                if prompt == "Optimized prompt for tutor agent to explain concepts clearly.":
+                    # Candidate train reaches 100% PASS (no failures)
+                    return 100.0, [CaseExecutionResult(id="t1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                # Baseline train has a failure
+                return 50.0, [CaseExecutionResult(id="t1", repeat=1, criteria=[CriterionResult(index=1, status="FAIL", reason="Failed")])], None
+            elif split == "val":
+                if prompt == "Optimized prompt for tutor agent to explain concepts clearly.":
+                    # Improves val from 80.0 to 90.0 -> KEEP!
+                    return 90.0, [CaseExecutionResult(id="v1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                return 80.0, [CaseExecutionResult(id="v1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+            elif split == "final":
+                return 95.0, [CaseExecutionResult(id="f1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+            return 0.0, [], None
+
+        mock_eval_split.side_effect = fake_eval_split
+
+        test_run_dir = os.path.join(self.tmp_dir.name, "run_keep_full_pass")
+        os.makedirs(test_run_dir, exist_ok=True)
+        with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+            with patch("sys.argv", ["hillclimb.py", "--target", self.prompt_path, "--eval", self.eval_path, "--runner", "codex", "--rounds", "3"]):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        # Optimizer should ONLY be called once for Round 1, NOT for Round 2!
+        self.assertEqual(mock_opt.call_count, 1)
+
+        # Round 1 dir exists, but Round 2 dir was never created
+        self.assertTrue(os.path.isdir(os.path.join(test_run_dir, "round-01")))
+        self.assertFalse(os.path.exists(os.path.join(test_run_dir, "round-02")))
+
+        summary_path = os.path.join(test_run_dir, "summary.md")
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = f.read()
+
+        self.assertIn("Rounds configured: 3", summary)
+        self.assertIn("Rounds executed: 1", summary)
+        self.assertIn("Stop reason: NO_TRAIN_FAILURE_SIGNAL", summary)
+        with open(os.path.join(test_run_dir, "best-prompt.md"), "r", encoding="utf-8") as f:
+            best_saved = f.read()
+        self.assertEqual(best_saved, "Optimized prompt for tutor agent to explain concepts clearly.")
+
+
+class TestStallAndCategorizer(unittest.TestCase):
+    def test_stall_categorizer_prompt_isolation(self):
+        failures = [
+            {
+                "id": "c1",
+                "input": "2+2=?",
+                "response": "5",
+                "failed_criteria": [{"index": 1, "criterion": "correct", "reason": "wrong answer"}],
+            }
+        ]
+        prompt = build_stall_categorizer_prompt("Best prompt text", failures)
+        self.assertIn("不要读取本地文件。", prompt)
+        self.assertIn("不要使用任何工具。", prompt)
+        self.assertIn("不要尝试寻找额外上下文。", prompt)
+        self.assertIn("Best prompt text", prompt)
+        self.assertIn("wrong answer", prompt)
+        self.assertIn("PROMPT_GAP", prompt)
+        self.assertIn("GRADER_ISSUE", prompt)
+        self.assertIn("AMBIGUOUS_EVAL", prompt)
+        self.assertIn("LIKELY_VARIANCE", prompt)
+        self.assertIn("OTHER", prompt)
+        self.assertIn("<current_best_prompt>", prompt)
+        self.assertIn("</current_best_prompt>", prompt)
+        self.assertNotIn("</current_prompt>", prompt)
+        self.assertIn("并非 Optimizer", prompt)
+        self.assertIn("严禁输出新的候选 Prompt", prompt)
+
+    def setUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.prompt_path = os.path.join(self.tmp_dir.name, "target.md")
+        with open(self.prompt_path, "w", encoding="utf-8") as f:
+            f.write("Initial prompt.")
+
+        self.eval_path = os.path.join(self.tmp_dir.name, "evals.jsonl")
+        cases = [
+            '{"id": "t1", "split": "train", "input": "train task", "criteria": ["crit1"]}',
+            '{"id": "v1", "split": "val", "input": "val task", "criteria": ["crit1"]}',
+            '{"id": "f1", "split": "final", "input": "final task", "criteria": ["crit1"]}',
+        ]
+        with open(self.eval_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(cases) + "\n")
+
+    def tearDown(self):
+        self.tmp_dir.cleanup()
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.run_stall_categorizer")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.evaluate_split")
+    def test_consecutive_reverts_triggers_stall_after_2_reverts(
+        self, mock_eval_split, mock_opt, mock_categorizer, mock_grader, mock_writable, mock_flags, mock_exec
+    ):
+        mock_grader.return_value = [CriterionResult(index=1, status="FAIL")]
+        mock_opt.side_effect = ["Candidate 1", "Candidate 2", "Candidate 3"]
+        mock_categorizer.return_value = "### Categorization\n- Primary: PROMPT_GAP\n- Recommendation: Clarify"
+
+        def fake_eval_split(runner, prompt, cases, repeats, timeout=300):
+            split = cases[0].split
+            if split == "train":
+                return 50.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="FAIL", reason="Failed")])], None
+            elif split == "val":
+                return 80.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="PASS")])], None
+            elif split == "final":
+                return 80.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="PASS")])], None
+            return 0.0, [], None
+
+        mock_eval_split.side_effect = fake_eval_split
+
+        test_run_dir = os.path.join(self.tmp_dir.name, "run_stall_test")
+        os.makedirs(test_run_dir, exist_ok=True)
+        with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+            with patch("sys.argv", ["hillclimb.py", "--target", self.prompt_path, "--eval", self.eval_path, "--runner", "codex", "--rounds", "5"]):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(mock_opt.call_count, 2)
+        mock_categorizer.assert_called_once()
+
+        # Explicitly verify categorizer arguments: best_prompt and best train failures, no val/final leak
+        cat_args, _ = mock_categorizer.call_args
+        self.assertEqual(cat_args[0], "codex")
+        self.assertEqual(cat_args[1], "Initial prompt.")
+        self.assertEqual(len(cat_args[2]), 1)
+        self.assertEqual(cat_args[2][0]["id"], "t1")
+        self.assertEqual(cat_args[2][0]["failed_criteria"][0]["reason"], "Failed")
+        for f in cat_args[2]:
+            self.assertNotEqual(f["id"], "v1")
+            self.assertNotEqual(f["id"], "f1")
+
+        stall_file = os.path.join(test_run_dir, "stall-analysis.md")
+        self.assertTrue(os.path.isfile(stall_file))
+        with open(stall_file, "r", encoding="utf-8") as f:
+            stall_content = f.read()
+        self.assertIn("PROMPT_GAP", stall_content)
+
+        summary_path = os.path.join(test_run_dir, "summary.md")
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = f.read()
+        self.assertIn("Rounds configured: 5", summary)
+        self.assertIn("Rounds executed: 2", summary)
+        self.assertIn("Stop reason: STALLED_AFTER_2_REVERTS", summary)
+        self.assertIn("stall-analysis.md", summary)
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.run_stall_categorizer")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.evaluate_split")
+    def test_stall_categorizer_failure_still_stops(
+        self, mock_eval_split, mock_opt, mock_categorizer, mock_grader, mock_writable, mock_flags, mock_exec
+    ):
+        mock_grader.return_value = [CriterionResult(index=1, status="FAIL")]
+        mock_opt.side_effect = ["Candidate 1", "Candidate 2"]
+        mock_categorizer.side_effect = RuntimeError("Categorizer agent crashed")
+
+        def fake_eval_split(runner, prompt, cases, repeats, timeout=300):
+            split = cases[0].split
+            if split == "train":
+                return 50.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="FAIL")])], None
+            elif split == "val":
+                return 80.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="PASS")])], None
+            elif split == "final":
+                return 80.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="PASS")])], None
+            return 0.0, [], None
+
+        mock_eval_split.side_effect = fake_eval_split
+
+        test_run_dir = os.path.join(self.tmp_dir.name, "run_stall_fail")
+        os.makedirs(test_run_dir, exist_ok=True)
+        with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+            with patch("sys.argv", ["hillclimb.py", "--target", self.prompt_path, "--eval", self.eval_path, "--runner", "codex", "--rounds", "4"]):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(mock_opt.call_count, 2)
+
+        stall_file = os.path.join(test_run_dir, "stall-analysis.md")
+        self.assertTrue(os.path.isfile(stall_file))
+        with open(stall_file, "r", encoding="utf-8") as f:
+            stall_content = f.read()
+        self.assertIn("Categorizer execution failed", stall_content)
+
+        summary_path = os.path.join(test_run_dir, "summary.md")
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = f.read()
+        self.assertIn("Rounds executed: 2", summary)
+        self.assertIn("Stop reason: STALLED_AFTER_2_REVERTS", summary)
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.run_stall_categorizer")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.evaluate_split")
+    def test_invalid_and_keep_resets_consecutive_reverts(
+        self, mock_eval_split, mock_opt, mock_categorizer, mock_grader, mock_writable, mock_flags, mock_exec
+    ):
+        mock_grader.return_value = [CriterionResult(index=1, status="FAIL")]
+        mock_opt.side_effect = [
+            "Candidate 1",  # R1: REVERT (count -> 1)
+            "Candidate 2",  # R2: INVALID (count -> 0)
+            "Candidate 3",  # R3: REVERT (count -> 1)
+            "Candidate 4",  # R4: KEEP (count -> 0)
+            "Candidate 5",  # R5: REVERT (count -> 1)
+            "Candidate 6",  # R6: REVERT (count -> 2, stall triggered!)
+        ]
+        mock_categorizer.return_value = "### Stall Analysis\n- Primary: PROMPT_GAP"
+
+        current_best_val = 80.0
+
+        def fake_eval_split(runner, prompt, cases, repeats, timeout=300):
+            nonlocal current_best_val
+            split = cases[0].split
+            if split == "train":
+                if prompt == "Candidate 2":
+                    # R2: candidate train error -> marks INVALID
+                    err = {"stage": "target", "type": "RuntimeError", "message": "Target error"}
+                    return 0.0, [CaseExecutionResult(id=cases[0].id, repeat=1, error=err)], err
+                return 50.0, [CaseExecutionResult(id=cases[0].id, repeat=1, input=cases[0].input, criteria=[CriterionResult(index=1, status="FAIL")])], None
+            elif split == "val":
+                if prompt == "Candidate 4":
+                    # R4: candidate val score improves +10 -> KEEP!
+                    return current_best_val + 10.0, [CaseExecutionResult(id=cases[0].id, repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                # Other candidates do not improve
+                return current_best_val, [CaseExecutionResult(id=cases[0].id, repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+            elif split == "final":
+                return 80.0, [CaseExecutionResult(id=cases[0].id, repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+            return 0.0, [], None
+
+        mock_eval_split.side_effect = fake_eval_split
+
+        test_run_dir = os.path.join(self.tmp_dir.name, "run_reset_test")
+        os.makedirs(test_run_dir, exist_ok=True)
+        with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+            with patch("sys.argv", ["hillclimb.py", "--target", self.prompt_path, "--eval", self.eval_path, "--runner", "codex", "--rounds", "10"]):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(mock_opt.call_count, 6)
+        mock_categorizer.assert_called_once()
+
+        summary_path = os.path.join(test_run_dir, "summary.md")
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = f.read()
+        self.assertIn("Rounds executed: 6", summary)
+        self.assertIn("Stop reason: STALLED_AFTER_2_REVERTS", summary)
+
+
+class TestFinalBlindComparison(unittest.TestCase):
+    def setUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.prompt_path = os.path.join(self.tmp_dir.name, "target.md")
+        with open(self.prompt_path, "w", encoding="utf-8") as f:
+            f.write("Initial target prompt for testing purposes.")
+
+        self.eval_path = os.path.join(self.tmp_dir.name, "evals.jsonl")
+        cases = [
+            '{"id": "t1", "split": "train", "input": "train task", "criteria": ["crit1"]}',
+            '{"id": "v1", "split": "val", "input": "val task", "criteria": ["crit1"]}',
+            '{"id": "f1", "split": "final", "input": "final task", "criteria": ["crit1"]}',
+        ]
+        with open(self.eval_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(cases) + "\n")
+
+    def tearDown(self):
+        self.tmp_dir.cleanup()
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.evaluate_split")
+    def test_final_comparison_best_differs_from_original_with_negative_delta(
+        self, mock_eval_split, mock_opt, mock_grader, mock_writable, mock_flags, mock_exec
+    ):
+        mock_grader.return_value = [CriterionResult(index=1, status="FAIL")]
+        mock_opt.return_value = "Candidate improved prompt"
+
+        def fake_eval_split(runner, prompt, cases, repeats, timeout=300):
+            split = cases[0].split
+            if split == "train":
+                return 50.0, [CaseExecutionResult(id="t1", repeat=1, criteria=[CriterionResult(index=1, status="FAIL")])], None
+            elif split == "val":
+                if prompt == "Candidate improved prompt":
+                    return 90.0, [CaseExecutionResult(id="v1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                return 80.0, [CaseExecutionResult(id="v1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+            elif split == "final":
+                if prompt == "Candidate improved prompt":
+                    # Best gets 70.0
+                    return 70.0, [CaseExecutionResult(id="f1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                # Original gets 80.0
+                return 80.0, [CaseExecutionResult(id="f1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+            return 0.0, [], None
+
+        mock_eval_split.side_effect = fake_eval_split
+
+        test_run_dir = os.path.join(self.tmp_dir.name, "run_final_diff")
+        os.makedirs(test_run_dir, exist_ok=True)
+        with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+            with patch("sys.argv", ["hillclimb.py", "--target", self.prompt_path, "--eval", self.eval_path, "--runner", "codex", "--rounds", "1"]):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(os.path.isfile(os.path.join(test_run_dir, "final", "original.jsonl")))
+        self.assertTrue(os.path.isfile(os.path.join(test_run_dir, "final", "best.jsonl")))
+
+        summary_path = os.path.join(test_run_dir, "summary.md")
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = f.read()
+
+        self.assertIn("## Final Blind Comparison", summary)
+        self.assertIn("Original: 80.0", summary)
+        self.assertIn("Best: 70.0", summary)
+        self.assertIn("Delta: -10.0", summary)
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.evaluate_split")
+    def test_final_comparison_best_equals_original_shared_result(
+        self, mock_eval_split, mock_opt, mock_grader, mock_writable, mock_flags, mock_exec
+    ):
+        mock_grader.return_value = [CriterionResult(index=1, status="FAIL")]
+        mock_opt.return_value = "Candidate rejected"
+
+        def fake_eval_split(runner, prompt, cases, repeats, timeout=300):
+            split = cases[0].split
+            if split == "train":
+                return 50.0, [CaseExecutionResult(id="t1", repeat=1, criteria=[CriterionResult(index=1, status="FAIL")])], None
+            elif split == "val":
+                return 80.0, [CaseExecutionResult(id="v1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+            elif split == "final":
+                return 85.0, [CaseExecutionResult(id="f1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+            return 0.0, [], None
+
+        mock_eval_split.side_effect = fake_eval_split
+
+        test_run_dir = os.path.join(self.tmp_dir.name, "run_final_same")
+        os.makedirs(test_run_dir, exist_ok=True)
+        with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+            with patch("sys.argv", ["hillclimb.py", "--target", self.prompt_path, "--eval", self.eval_path, "--runner", "codex", "--rounds", "1"]):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(os.path.isfile(os.path.join(test_run_dir, "final", "original.jsonl")))
+        self.assertFalse(os.path.exists(os.path.join(test_run_dir, "final", "best.jsonl")))
+        self.assertFalse(os.path.exists(os.path.join(test_run_dir, "final", "final.jsonl")))
+
+        summary_path = os.path.join(test_run_dir, "summary.md")
+        with open(summary_path, "r", encoding="utf-8") as f:
+            summary = f.read()
+
+        self.assertIn("Execution backend: codex", summary)
+        self.assertIn("## Final Blind Comparison", summary)
+        self.assertIn("Original == Best", summary)
+        self.assertIn("Original: 85.0", summary)
+        self.assertIn("Best: 85.0 (shared with Original)", summary)
+        self.assertIn("Delta: 0.0 (no accepted prompt change)", summary)
+
+    @patch("hillclimb.check_runner_executable", return_value="/bin/codex")
+    @patch("hillclimb.verify_runner_cli_flags")
+    @patch("hillclimb.verify_hillclimb_writable")
+    @patch("hillclimb.run_grader")
+    @patch("hillclimb.run_optimizer")
+    @patch("hillclimb.evaluate_split")
+    def test_final_comparison_errors_parameterized(
+        self, mock_eval_split, mock_opt, mock_grader, mock_writable, mock_flags, mock_exec
+    ):
+        cases_to_test = [
+            # (test_name, is_same_prompt, fail_original, fail_best)
+            ("divergent_original_fails", False, True, False),
+            ("divergent_best_fails", False, False, True),
+            ("identical_shared_fails", True, True, False),
+        ]
+
+        for test_name, is_same, fail_orig, fail_best in cases_to_test:
+            with self.subTest(case=test_name):
+                mock_grader.return_value = [CriterionResult(index=1, status="FAIL")]
+                mock_opt.return_value = "Initial target prompt for testing purposes." if is_same else "Candidate improved prompt"
+
+                def fake_eval_split(runner, prompt, cases, repeats, timeout=300):
+                    split = cases[0].split
+                    if split == "train":
+                        return 50.0, [CaseExecutionResult(id="t1", repeat=1, criteria=[CriterionResult(index=1, status="FAIL")])], None
+                    elif split == "val":
+                        if prompt == "Candidate improved prompt":
+                            return 90.0, [CaseExecutionResult(id="v1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                        return 80.0, [CaseExecutionResult(id="v1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                    elif split == "final":
+                        if prompt == "Candidate improved prompt":
+                            if fail_best:
+                                err = {"stage": "target", "type": "RuntimeError", "message": "Best final crashed"}
+                                return 0.0, [CaseExecutionResult(id="f1", repeat=1, error=err)], err
+                            return 90.0, [CaseExecutionResult(id="f1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                        else:
+                            if fail_orig:
+                                err = {"stage": "target", "type": "RuntimeError", "message": "Original final crashed"}
+                                return 0.0, [CaseExecutionResult(id="f1", repeat=1, error=err)], err
+                            return 80.0, [CaseExecutionResult(id="f1", repeat=1, criteria=[CriterionResult(index=1, status="PASS")])], None
+                    return 0.0, [], None
+
+                mock_eval_split.side_effect = fake_eval_split
+
+                test_run_dir = os.path.join(self.tmp_dir.name, f"run_final_{test_name}")
+                os.makedirs(test_run_dir, exist_ok=True)
+                with patch("hillclimb.create_unique_run_dir", return_value=test_run_dir):
+                    with patch("sys.argv", ["hillclimb.py", "--target", self.prompt_path, "--eval", self.eval_path, "--runner", "codex", "--rounds", "1"]):
+                        exit_code = main()
+
+                self.assertEqual(exit_code, 1)
+
+                summary_path = os.path.join(test_run_dir, "summary.md")
+                with open(summary_path, "r", encoding="utf-8") as f:
+                    summary = f.read()
+
+                self.assertIn("Execution backend: codex", summary)
+                self.assertIn("## Final Blind Comparison", summary)
+                self.assertIn("Final comparison: FAILED", summary)
+                self.assertIn("Delta: FAILED", summary)
+                # Ensure no numeric delta is present
+                self.assertNotIn("Delta: 0.0", summary)
+                self.assertNotIn("Delta: +", summary)
+                self.assertNotIn("Delta: -", summary)
+
+                if is_same:
+                    self.assertIn("Original == Best", summary)
+                    self.assertIn("Original: FAILED (target: Original final crashed)", summary)
+                    self.assertIn("Best: FAILED (target: Original final crashed) (shared with Original)", summary)
+                    self.assertFalse(os.path.exists(os.path.join(test_run_dir, "final", "best.jsonl")))
+                elif fail_orig:
+                    self.assertIn("Original: FAILED (target: Original final crashed)", summary)
+                    self.assertIn("Best: 90.0", summary)
+                elif fail_best:
+                    self.assertIn("Original: 80.0", summary)
+                    self.assertIn("Best: FAILED (target: Best final crashed)", summary)
 
 
 if __name__ == "__main__":

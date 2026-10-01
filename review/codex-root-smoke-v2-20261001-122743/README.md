@@ -19,6 +19,7 @@
   - **本次 Smoke v2 测试是以 `tested-source/` 目录中的代码快照作为唯一被测依据**。
   - 切勿误把仓库根目录历史提交或未提交的工作区旧状态误当作被测版本。
   - `tested-source/` 已与当时测试现场代码做逐字节哈希核对，完全一致。后续远程复现与审计必须严格基于 `tested-source/` 快照。
+  - **产品版本一致性说明**：本次后续产品提交的根目录 5 个文件与 `tested-source/` 快照内容完全一致；同时保留测试执行当时这 5 个文件处于未提交 dirty 状态的历史事实。
 
 ---
 
@@ -85,7 +86,7 @@
   - Delta：**0.0**（无接受的 Prompt 变更）
 - **模型调用统计（按实际执行路径推算）**：
   - 理论预算上限：16 次
-  - **实际调用总数：9 次**（精确按实际代码分支路径核算，非估算）：
+  - **实际调用总数：9 次**（按已记录执行路径推算，非后端逐调用计量）：
     - Baseline: **4 次**（Train target 1 + Train grader 1 + Val target 1 + Val grader 1）
     - Preflight: **3 次**（Repeat-val target 1 + Repeat-val grader 1 + Train grader stability check 1）
     - Rounds: **0 次**（因触发 `NO_TRAIN_FAILURE_SIGNAL` 提前停止，未调用优化器）
@@ -108,20 +109,20 @@
 - **`--limit 1` 实际生效范围**：由于指定了 `--limit 1`，每个 split 实际仅各运行了第 1 条用例。
 - **核心指标局限性警示**：
   - 评测用例为合成测试集，非生产环境真实黄金集。
-  - 上一次测试（20260930-174424）Final 得分为 33.3%（在 3 项判定点中 PASS 1 项），本次 Final 得分为 66.7%（PASS 2 项）。**这绝不代表 Prompt 本身有任何质量改进**。本次 Prompt 根本未做变更（`Original == Best`，Delta = 0.0），得分差异仅系单样本评估下 LLM 生成的随机微弱波动与小样本特性所致。
+  - 上一次测试（20260930-174424）Final 得分为 33.3%（在 3 项判定点中 PASS 1 项），本次 Final 得分为 66.7%（PASS 2 项）。**这绝不能归因于 Prompt 本身的质量提升**。本次 Prompt 根本未做变更（`Original == Best`，Delta = 0.0），得分差异可能受模型生成波动、裁判评判差异等因素影响，并非已证明的确定原因，不可作为模型通用泛化改善的证明。
   - 小样本单次 Smoke 运行绝非正式统计学证据，亦不能作为模型通用泛化改善的证明。
 
 ---
 
 ## 6. 复现指南
 
-若需完全隔离地复现本次测试，可直接使用本目录中的 `tested-source/` 快照与 `inputs/`：
+若需使用冻结源码复现本次测试，可直接使用本目录中的 `tested-source/` 快照与 `inputs/`（明确提示：执行后端仍可能加载全局上下文或配置，且受模型生成波动影响，输出不保证绝对一致）：
 
 ```bash
 # 导航至本 review 目录所在仓库根目录
 
-# 1. 运行快照源码单元测试
-PYTHONPATH=review/codex-root-smoke-v2-20261001-122743/tested-source python3 -m unittest -q
+# 1. 运行快照源码单元测试（进入 tested-source 目录以确保加载快照代码与测试，避免受到仓库根目录同名文件影响）
+( cd review/codex-root-smoke-v2-20261001-122743/tested-source && python3 -m unittest -q )
 
 # 2. 复现 Dry-Run 预检
 PYTHONPATH=review/codex-root-smoke-v2-20261001-122743/tested-source python3 \
