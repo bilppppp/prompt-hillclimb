@@ -1,8 +1,8 @@
 # Prompt Hillclimb MVP
 
-`prompt-hillclimb` 是一个面向通用 AI Agent 与 Coding Harness 的轻量级 Prompt 自动优化工具与便携式 Skill。核心方法与评测框架不绑定特定 Agent 体系。
+`prompt-hillclimb` 是一个面向通用 AI Agent 与 Coding Harness 的轻量级 Prompt 自动优化工具与便携式 Skill。核心算法与评测框架不绑定任何特定 Agent 体系或 Coding Harness。
 
-通过划分 `train`（Learning Signal）、`val`（Selection Signal）和 `final`（Blind Confirmation）三重经验评测集，借助本机配置好的 execution backend（当前 Python MVP 参考实现支持 `codex` 与 `pi` CLI），通过带有拒绝与早期停止机制的 Hillclimb 循环持续寻找具备实际泛化能力的 Prompt 改进版本。
+通过划分 `train`（Learning Signal）、`val`（Selection Signal）和 `final`（Blind Confirmation）三重经验评测集，配合标准化的执行运行时契约（通过 `--runtime` 指定可执行程序），通过带有拒绝与早期停止机制的 Hillclimb 循环持续寻找具备实际泛化能力的 Prompt 改进版本。
 
 > **核心声明**：当前版本专注于优化纯文本输入/输出（text-in / text-out）的通用 Prompt 行为，并不等价于测试真实 system prompt slot、AGENTS.md 注入、Skill 触发机制或完整 coding agent 工具链调用行为。
 
@@ -41,7 +41,7 @@
 
 - **操作系统**：macOS / Linux / Windows
 - **运行时**：Python 3.10+（**纯标准库**，无任何第三方 pip 依赖；已在 Python 3.14 下完整验证）
-- **Execution Backend**：本机已具备可调用的 CLI 执行环境（当前参考实现支持 `codex` 或 `pi` CLI）。
+- **Runtime Executable**：任何符合 [Runtime Contract](references/runtime-contract.md) 的可执行程序（仓库提供了针对常见 CLI 的参考封装脚本，位于 `examples/runtimes/`）。
 
 ---
 
@@ -76,29 +76,34 @@
 
 ## 5. 快速上手
 
-### 5.1 Dry Run 预检
-在不发起真实执行调用的情况下验证数据格式、Runner 可用性、配置参数并打印执行调用次数预估：
+> [!IMPORTANT]
+> **Runtime 前置确认**：在执行任何 Hillclimb 命令前，必须先确定并确认 `--runtime` 所指向的可执行程序（规范见 [Runtime Contract](references/runtime-contract.md) 与 [Runtime 选择引导规范](references/runtime-selection.md)）。
+> - **用户已指定**：若用户已明确指定 Runtime 路径或特定 Harness，优先遵循；
+> - **用户未指定**：Agent **不得擅自默认某种 Harness**。必须首先进行非侵入式环境探测、呈现候选方案（可调用性、fresh session、隔离能力等），**经用户显式确认选定后**再将路径代入以下命令中的 `$RUNTIME_PATH`。
+
+### 5.1 Dry Run 预检（零调用）
+在不发起真实执行调用的情况下验证数据格式、Runtime 可执行性、配置参数并打印执行调用次数预估：
 ```bash
 python3 hillclimb.py \
   --target examples/tutor-prompt.md \
   --eval examples/tutor-evals.jsonl \
-  --runner codex \
+  --runtime "$RUNTIME_PATH" \
   --rounds 1 \
   --dry-run
 ```
 
 ### 5.2 测量基线噪声（可选独立模式）
-Prompt 评估容易受到 natural variance 干扰。使用 `--measure-noise` 会独立执行 2 次 Baseline 评测并计算验证集的分数波动：
+Prompt 评估容易受到自然波动干扰。使用 `--measure-noise` 会独立执行 2 次 Baseline 评测并计算验证集的分数波动：
 ```bash
 python3 hillclimb.py \
   --target examples/tutor-prompt.md \
   --eval examples/tutor-evals.jsonl \
-  --runner codex \
+  --runtime "$RUNTIME_PATH" \
   --measure-noise
 ```
 输出示例：
 ```text
-Agent invocation estimate (Noise Measurement):
+Runtime invocation estimate (Noise Measurement):
   Run 1: 12
   Run 2: 12
   Total: ~24
@@ -119,25 +124,16 @@ Consider using --min-gain >= 17 or increasing --repeats.
 ```
 
 ### 5.3 启动 Hillclimb 优化
-使用 Codex Runner 运行 3 轮优化：
+使用经用户确认的 `$RUNTIME_PATH` 运行 3 轮优化：
 ```bash
 python3 hillclimb.py \
   --target examples/tutor-prompt.md \
   --eval examples/tutor-evals.jsonl \
-  --runner codex \
+  --runtime "$RUNTIME_PATH" \
   --rounds 3 \
   --min-gain 3.0
 ```
-
-使用 Pi Runner 运行优化：
-```bash
-python3 hillclimb.py \
-  --target examples/tutor-prompt.md \
-  --eval examples/tutor-evals.jsonl \
-  --runner pi \
-  --rounds 3 \
-  --min-gain 3.0
-```
+*(注：若使用仓库自带的参考封装脚本，请参阅后文第 10 节 [参考 Runtime 封装](#10-参考-runtime-封装reference-runtimes) 获取具体调用示例。)*
 
 ---
 
@@ -147,7 +143,7 @@ python3 hillclimb.py \
 | :--- | :--- | :--- | :--- |
 | `--target` | 路径 | 必须 | 待优化的初始 Prompt 文件路径（如 markdown 或 txt） |
 | `--eval` | 路径 | 必须 | 评测数据集 JSONL 路径 |
-| `--runner` | `codex` \| `pi` | `codex` | 指定调用的本机 CLI execution backend |
+| `--runtime` | 路径 | 必须 | 符合 [Runtime Contract](references/runtime-contract.md) 的可执行程序路径（无默认值） |
 | `--rounds` | 整数 | `3` | Hillclimb 尝试优化的轮次上限（配置轮次） |
 | `--repeats` | 整数 | `1` | 每个 case 的重复评测次数，综合平摊单次采样方差 |
 | `--min-gain` | 浮点数 | `3.0` | 接受 candidate 的最小验证集得分提升（百分点） |
@@ -191,15 +187,15 @@ $$\text{candidate\_train} \ge \text{best\_train} \quad \text{AND} \quad \text{ca
 
 ### 7.5 Final 盲测对比（Final Blind Comparison）
 全流程选择全部结束后，执行一次最终盲测对比：
-- **Best != Original**：分别使用相同 backend 和 repeats 评测 Original 与 Best，生成 `final/original.jsonl` 与 `final/best.jsonl`，报告 `Delta: Best - Original`（负值照实报告）。
+- **Best != Original**：分别使用相同 runtime 和 repeats 评测 Original 与 Best，生成 `final/original.jsonl` 与 `final/best.jsonl`，报告 `Delta: Best - Original`（负值照实报告）。
 - **Best == Original**：只执行 1 次评测，逻辑共用结果，生成 `final/original.jsonl`，明确报告 `Delta: 0.0 (no accepted prompt change)`。
 - **错误语义**：若任何一方评测发生异常，保留错误并报告 `Final comparison: FAILED`，不生成虚假 Delta，程序以非零状态码退出。
 
 ---
 
-## 8. 执行调用次数估算（Agent Invocation Estimate）
+## 8. 执行调用次数估算（Runtime Invocation Estimate）
 
-每次运行的 Agent 执行调用次数（Agent invocation estimate，上限）计算公式如下：
+每次运行的 Runtime 执行调用次数（Runtime invocation estimate，上限）计算公式如下：
 - **Baseline**：$(\text{train} + \text{val}) \times \text{repeats} \times 2$
 - **Preflight**：$2 \times \text{val} \times \text{repeats} \text{ (Noise)} + \min(3, \text{train} \times \text{repeats}) \text{ (Grader stability)}$
 - **每轮 Candidate**：$1 \text{ (Optimizer)} + (\text{train} + \text{val}) \times \text{repeats} \times 2$
@@ -215,54 +211,82 @@ $$\text{candidate\_train} \ge \text{best\_train} \quad \text{AND} \quad \text{ca
 $$\text{Total (upper bound)} = 12 + 7 + 39 + 1 + 8 = 67 \text{ calls}$$
 
 > [!NOTE]
-> Hillclimb会重复调用当前execution backend，正式运行前用--dry-run查看预计执行次数。
+> Hillclimb 会重复调用指定的 Runtime，正式运行前请务必使用 `--dry-run` 查看预计执行次数。
 
 ---
 
-## 9. 子进程隔离与当前 CLI 能力限制
+## 9. 子进程隔离机制与边界
 
-### 9.1 临时目录隔离
-每次调用 execution backend（Target、Grader、Optimizer、Categorizer）时，主程序都会：
+### 9.1 Core 临时目录隔离
+每次调用 Runtime（Target、Grader、Optimizer、Categorizer）时，Core 保证：
 1. 创建全新的独立临时目录 `tempfile.TemporaryDirectory()`。
 2. 将子进程的 `cwd` 强制设定为该空临时目录。
 3. 严禁在临时目录内拷贝原 prompt、eval JSONL、`.hillclimb/` 历史记录或项目文件。
-4. 所需文本均通过标准输入（stdin）或参数传入，并在 Prompt 首部注入无外部工具与目录读取的强指令。
+4. 完整的 Prompt 文本通过标准输入（stdin）管道传输。
+5. 在 Prompt 首部注入无外部工具与目录读取的明确约束指令。
 
-### 9.2 Codex CLI 隔离与局限
-- **已使用的隔离参数**：
-  - `-C <temp_dir>`：强制工作根目录为新空临时目录
+### 9.2 隔离局限声明
+> [!WARNING]
+> 仅靠 Core 切换空临时 `cwd` 并不能完全消除底层环境的影响。若底层 Runtime 所在的系统或用户主目录下存在全局指令、扩展或插件，仍可能在执行时被隐式挂载。详见 [Runtime Contract](references/runtime-contract.md)。
+
+---
+
+## 10. 参考 Runtime 封装（Reference Runtimes）
+
+仓库在 `examples/runtimes/` 目录下提供了两个开箱即用的参考封装脚本，供接入常见 CLI 工具时参考：
+
+### 10.1 Codex 参考封装 (`examples/runtimes/codex-runtime.sh`)
+- **使用参数**：
+  - `-C <temp_dir>`：强制工作目录为独立临时目录
   - `--skip-git-repo-check`：脱离 git 仓库限制
   - `--ephemeral`：不持久化会话记录
   - `--ignore-user-config`：忽略用户级 config.toml
   - `--ignore-rules`：忽略本地 execpolicy 规则
-  - `-s read-only`：启用 read-only 沙箱，禁止外部工作区写操作
+  - `-s read-only`：启用只读沙箱，禁止外部写操作
   - `--color never`：关闭 ANSI 颜色标记
-  - `-o <output_file>`：直接输出模型最后一次回答至目标文件，规避终端格式混淆
-- **当前限制与明确说明**：
-  - **Read-only 不等于禁用读文件或工具**：`-s read-only` 仅禁止破坏性写操作，底层执行环境仍然具备读取系统文件或触发工具的能力，不能声称 Codex 实现了完全隔离。
-  - **全局指令与技能污染**：若 `$CODEX_HOME/AGENTS.md` 或全局 `$CODEX_HOME/skills` 存在，相关指令与技能上下文仍可能被底层载入。程序在运行时会输出明确 WARNING，但绝不自动篡改或删除用户全局配置。
+  - `-o <output_file>`：直接输出模型最后一次回答至目标文件，经由 stdout 输出
+- **调用示例（仅在经用户确认使用 Codex 时参考，非默认）**：
+  ```bash
+  python3 hillclimb.py \
+    --target examples/tutor-prompt.md \
+    --eval examples/tutor-evals.jsonl \
+    --runtime examples/runtimes/codex-runtime.sh \
+    --rounds 3 \
+    --min-gain 3.0
+  ```
+- **已知限制**：`-s read-only` 仅禁止破坏性写操作，底层执行环境若存在全局 `~/.codex/AGENTS.md` 或全局 skills，仍可能被载入。脚本会向 `stderr` 打印告警。
 
-### 9.3 Pi CLI 隔离与局限
-- **已使用的隔离参数与输入方式**：
+### 10.2 Pi 参考封装 (`examples/runtimes/pi-runtime.sh`)
+- **使用参数**：
   - `-p`（`--print`）：非交互单次打印模式
-  - **标准输入传参（stdin）**：Prompt 完整通过 stdin 管道传入，彻底规避 CLI 参数长度限制以及 `@filename` 语法误触发文件载入的边界问题。
+  - 标准输入传参（stdin）：规避参数长度限制与 `@filename` 语法
   - `--no-tools`：彻底禁用所有内建与扩展工具
   - `--no-skills`：禁用所有技能发现
   - `--no-context-files`：彻底禁用 `AGENTS.md` 与 `CLAUDE.md` 发现与加载
   - `--no-extensions`：禁用外部插件
-  - `--no-session`：无状态瞬态运行，不落盘
+  - `--no-session`：无状态瞬态运行，不落盘会话
   - `--no-prompt-templates`：禁用模板载入
   - `--no-themes`：禁用交互主题
   - `--no-approve`：忽略项目本地信任配置
-- **当前限制与明确说明**：
-  - **全局 SYSTEM.md / APPEND_SYSTEM.md 绕过风险**：经源码确认，Pi CLI 的 `--no-context-files` 仅负责清空 `AGENTS.md` 与 `CLAUDE.md`，若用户目录（如 `~/.pi/agent/SYSTEM.md` 或 `APPEND_SYSTEM.md`）存在系统提示词文件，Pi 底层仍会将其作为 system prompt 载入。主程序在启动时会检测该路径并打印 WARNING，但绝不擅自篡改用户文件。
-  - **底层 Persona 模板**：底层各 execution backend 的默认系统提示词模板由 CLI 内部控制，无法完全抹除 runner 自身的默认 coding assistant persona。
+- **调用示例（仅在经用户确认使用 Pi 时参考，非默认）**：
+  ```bash
+  python3 hillclimb.py \
+    --target examples/tutor-prompt.md \
+    --eval examples/tutor-evals.jsonl \
+    --runtime examples/runtimes/pi-runtime.sh \
+    --rounds 3 \
+    --min-gain 3.0
+  ```
+- **已知限制**：`--no-context-files` 仅负责清空 `AGENTS.md` 与 `CLAUDE.md`，若用户目录存在全局 `SYSTEM.md` 或 `APPEND_SYSTEM.md`，仍可能被作为 system prompt 载入。脚本会向 `stderr` 打印告警。
+
+### 10.3 其他 Harness 的接入
+任何其他 Coding Harness（如 OpenCode、Hermes、OpenClaw、AGY 等）只要通过最小封装脚本符合 [Runtime Contract](references/runtime-contract.md) 即可作为 `--runtime` 传入。本仓库当前未对其他 Harness 做预制封装或兼容性验证，不限定只能使用上述两种参考封装。
 
 ---
 
-## 10. 输出目录结构与报告示例
+## 11. 输出目录结构与报告示例
 
-### 10.1 目录结构
+### 11.1 目录结构
 每次运行在当前目录下生成 `.hillclimb/YYYYMMDD-HHMMSS/`（若同秒多次调用自动追加 `_1`、`_2` 等后缀）：
 
 ```text
@@ -288,11 +312,11 @@ $$\text{Total (upper bound)} = 12 + 7 + 39 + 1 + 8 = 67 \text{ calls}$$
         └── best.jsonl            # Best Prompt 在 final 盲测集上的评测明细（若 Best!=Original）
 ```
 
-### 10.2 Summary 报告示例
+### 11.2 Summary 报告示例
 ```markdown
 # Prompt Hillclimb
 
-Execution backend: codex
+Execution runtime: /path/to/examples/runtimes/codex-runtime.sh
 Rounds configured: 3
 Rounds executed: 2
 Stop reason: STALLED_AFTER_2_REVERTS
@@ -345,12 +369,12 @@ stall-analysis.md
 
 ---
 
-## 11. 已知限制与使用建议
+## 12. 已知限制与使用建议
 
 1. **Eval 质量决定优化上限**：Prompt 得分提高不代表现实效果一定变好。有偏或低质的标准会导致模型优化到错误或投机的方向。
 2. **Val 仍会被间接过拟合**：虽然 Optimizer 不可见 Val 内容，但由于每一轮的 KEEP/REVERT 由 Val 分数决定，Val 充当了选择集角色。多轮迭代后 Val 分数仍可能虚高，因此必须依靠最终一次性的 Final 盲测作校核。
 3. **示例与小样本局限**：示例中的少量 case 仅供快速验证流程通道，小样本无法证明 Prompt 真正得到改进。正式使用需要构建规模更大、覆盖更多样真实场景的 case 集合，并结合 `--measure-noise` 与 `--repeats` 观察结果稳定性，而不是盲目将小样本波动宣称为统计结论。
 4. **默认 min-gain 仅为工程经验值**：默认 `--min-gain 3.0` 是一个保守的工程经验阈值，并无通用统计显著性意义。强烈建议先使用 `--measure-noise` 观测 baseline 在当前任务上的天然波动，再针对性选择合理阈值。
 5. **LLM Grader 波动**：细粒度 Criterion PASS/FAIL 旨在拆解多维度要求、减少单一大分的主观性，但仍可能受判定抖动影响。Preflight 的 Grader stability 提供了轻量观测通道。
-6. **同 Execution Backend 偏好风险（Self-preference）**：当前 MVP 的 Target、Grader 和 Optimizer 复用同一 CLI runner，可能存在自洽偏好或关联错误。代码内部保留了 `run_target`、`run_grader`、`run_optimizer` 独立函数，为后续扩展多 backend 架构预留了扩展点。
+6. **同 Runtime 偏好风险（Self-preference）**：当前 Target、Grader 和 Optimizer 复用同一 Runtime 可执行文件，可能存在自洽偏好或关联错误。代码内部保留了 `run_target`、`run_grader`、`run_optimizer` 独立函数，为后续扩展多 Runtime 架构预留了扩展点。
 7. **防泄漏启发式并不绝对**：当前的文本滑动窗口检查无法拦截同义改写（paraphrase）或语义层面的基准记忆（benchmark memorization）。
