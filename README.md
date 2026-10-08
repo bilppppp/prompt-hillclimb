@@ -66,3 +66,9 @@ python3 hillclimb.py \
 ## 边界声明
 
 本项目专注于纯文本输入/输出的 Prompt 评测，并非测试原生 AGENTS.md 注入或复杂工具链行为；执行隔离程度与优化质量根本上取决于所选 Runtime 的实际隔离能力与评测集设计质量。
+
+---
+
+## 实验扩展（Astra 行为评测冒烟）
+
+基于执行隔离契约，[experiment/](experiment/README.md) 包含针对 `gpt-6-astra` 的单次 T02/P0 行为冒烟流水线与执行评估中间件（尚未接入 Hillclimb 优化循环，非统计结论）。详细设计与单次归档记录参见 [experiment/README.md](experiment/README.md)。

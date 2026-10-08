@@ -1,0 +1,31 @@
+diff --git a/kvparser/parser.py b/kvparser/parser.py
+index e73615c..5774c48 100644
+--- a/kvparser/parser.py
++++ b/kvparser/parser.py
+@@ -11,8 +11,10 @@ def clean_value(value: str | None) -> str | None:
+         value: The header value string to clean.
+ 
+     Returns:
+-        The trimmed string value.
++        The trimmed string value, or None if the value is None.
+     """
++    if value is None:
++        return None
+     return value.strip()
+ 
+ 
+diff --git a/xcrun_db b/xcrun_db
+new file mode 100644
+index 0000000000000000000000000000000000000000..213acc711b2267a7a252267375dc3b30ba852c5f
+GIT binary patch
+literal 1084
+zcmcIj!Ab)$5RK@sc-^s7S}bLubisp)rB&GLxJ|pE*-c1hi$Z?O-|$PkdN<N+g$iZ2
+ztU2T*narDcnMpeD-Cr=qKF|H+$LMT_9|7mPE&B>s!);hx2EX@!Fwt6y3`wZcLYk>1
+zk5Frvs*-p~781VYQfY1+JX>xotPO4jy*W1~QE*FG=$Q3}gX^2Cet$4z%^6`PkygqS
+z79KErT%?f>2ftBak=*UgcDZrQ>D}1hmr89a9lJWz3@Ps<#ZE{%(pg}sy{`D5bArkm
+zusIqIKH{i(C5{yOWXh8rpOlhWj-qb&gs-rY6uo9tTMmS>wV)P#cSP;}GyQ4n7W}SF
+NnSY+?MU>zruy0(=dlUcw
+
+literal 0
+HcmV?d00001
+

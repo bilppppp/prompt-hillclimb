@@ -1,0 +1,5 @@
+{
+  "judge_model": "gemini-3.8-flash-high",
+  "status": "judge_error",
+  "error": "Judge exit code 2"
+}

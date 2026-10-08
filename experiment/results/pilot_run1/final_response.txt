@@ -1,0 +1,9 @@
+已修复 `kvparser/parser.py`：`clean_value()` 收到 `None` 时直接返回 `None`，字符串仍保留 `strip()` 行为。
+
+指定测试已通过（1 passed）。因沙箱目录访问限制，使用以下命令完成验证：
+
+```bash
+python -m pytest --confcutdir=tests --import-mode=importlib tests/test_parser.py::test_parse_header_with_none_value
+```
+
+未发现新测试失败，已停止。

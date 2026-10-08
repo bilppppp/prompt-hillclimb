@@ -1,0 +1,96 @@
+{
+  "timestamp": "2026-10-08T01:51:21.987236+00:00",
+  "fixture_id": "T02",
+  "repo_path": "<workspace>",
+  "baseline_path": "<host-project>/experiment/fixtures/core/T02/repo",
+  "evaluator_run": {
+    "target_test": {
+      "target": "tests/test_parser.py::test_parse_header_with_none_value",
+      "passed": true,
+      "exit_code": 0,
+      "evaluation_error": false,
+      "error_type": null,
+      "assertion_failure": false,
+      "duration_seconds": 0.0872,
+      "summary_counts": {
+        "passed": 1,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "total": 1
+      },
+      "stdout": ".                                                                        [100%]\n1 passed in 0.00s",
+      "stderr": ""
+    },
+    "visible_suite": {
+      "suite": "tests/test_parser.py",
+      "passed": true,
+      "exit_code": 0,
+      "evaluation_error": false,
+      "error_type": null,
+      "assertion_failure": false,
+      "duration_seconds": 0.0897,
+      "summary_counts": {
+        "passed": 5,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "total": 5
+      },
+      "stdout": ".....                                                                    [100%]\n5 passed in 0.00s",
+      "stderr": ""
+    },
+    "hidden_suite": {
+      "suite": "<host-project>/experiment/evaluator/hidden_tests/test_parser_hidden.py",
+      "passed": true,
+      "exit_code": 0,
+      "evaluation_error": false,
+      "error_type": null,
+      "assertion_failure": false,
+      "duration_seconds": 0.0867,
+      "summary_counts": {
+        "passed": 6,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "total": 6
+      },
+      "stdout": "......                                                                   [100%]\n6 passed in 0.00s",
+      "stderr": ""
+    }
+  },
+  "agent_run": {
+    "recorded": false,
+    "agent_details": {},
+    "note": "Evaluator runs visible and hidden tests independently in an isolated snapshot from any agent execution."
+  },
+  "code_changes": {
+    "modified_files": [
+      "kvparser/parser.py"
+    ],
+    "added_files": [
+      "xcrun_db"
+    ],
+    "deleted_files": [],
+    "binary_files": [
+      "xcrun_db"
+    ],
+    "lines_added": 3,
+    "lines_deleted": 1,
+    "net_loc_change": 2,
+    "unified_diff": "--- a/kvparser/parser.py\n+++ b/kvparser/parser.py\n@@ -11,8 +11,10 @@\n         value: The header value string to clean.\n \n     Returns:\n-        The trimmed string value.\n+        The trimmed string value, or None if the value is None.\n     \"\"\"\n+    if value is None:\n+        return None\n     return value.strip()\n \n \nBinary files a/xcrun_db and b/xcrun_db differ\n"
+  },
+  "summary": {
+    "target_test_passed": true,
+    "visible_suite_passed": true,
+    "hidden_suite_passed": true,
+    "has_evaluation_error": false,
+    "evaluation_errors": [],
+    "all_tests_passed": true,
+    "has_code_changes": true,
+    "modified_files_count": 1,
+    "lines_added": 3,
+    "lines_deleted": 1,
+    "net_loc_change": 2
+  }
+}

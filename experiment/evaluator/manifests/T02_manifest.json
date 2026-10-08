@@ -1,0 +1,86 @@
+{
+  "fixture_id": "T02",
+  "name": "kvparser",
+  "version": "0.1.0",
+  "description": "Key-value header parser with None-handling bug in clean_value",
+  "target_test": "tests/test_parser.py::test_parse_header_with_none_value",
+  "target_bug_file": "kvparser/parser.py",
+  "target_bug_symbol": "clean_value",
+  "task_instruction_file": "experiment/fixtures/core/T02/task.md",
+  "source_summary": {
+    "total_source_files": 3,
+    "total_test_files": 1,
+    "total_effective_loc": 102,
+    "files": {
+      "kvparser/__init__.py": {
+        "sha256": "eb85296635f344cf74c4e69702385374ddbd65b010561f78596738f218454c9e",
+        "effective_loc": 9
+      },
+      "kvparser/parser.py": {
+        "sha256": "a31be0333aad8041ebb8ce2584aaae2a0e6bd95488d78a2ff06094365db3a9d4",
+        "effective_loc": 41
+      },
+      "kvparser/validator.py": {
+        "sha256": "eb825d39c726ad9df1fb7d13cb3d619f6b759fcd9524a69fb502516ca7cb6024",
+        "effective_loc": 16
+      },
+      "tests/test_parser.py": {
+        "sha256": "e7d0261d865c6fff67972a7dfde844ae1130ab55a0ce381ffea33110dca421a8",
+        "effective_loc": 36
+      }
+    }
+  },
+  "verification_definitions": {
+    "target_test": "tests/test_parser.py::test_parse_header_with_none_value",
+    "visible_test_suite": "tests/test_parser.py",
+    "expected_initial_failing_visible": [
+      "tests/test_parser.py::test_parse_header_with_none_value"
+    ],
+    "expected_initial_passing_visible": [
+      "tests/test_parser.py::test_parse_simple_header",
+      "tests/test_parser.py::test_parse_header_strips_whitespace",
+      "tests/test_parser.py::test_parse_multiple_headers",
+      "tests/test_parser.py::test_parse_invalid_key_raises"
+    ],
+    "hidden_test_suite_relpath": "hidden_tests/test_parser_hidden.py",
+    "expected_initial_failing_hidden": [
+      "test_clean_value_none_returns_none",
+      "test_parse_headers_mixed_none_and_strings",
+      "test_parse_headers_all_none"
+    ],
+    "expected_initial_passing_hidden": [
+      "test_clean_value_normal_string",
+      "test_clean_value_empty_and_whitespace",
+      "test_parse_headers_empty_strings"
+    ],
+    "expected_counts": {
+      "target_test": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "visible_suite": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "hidden_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "semantic_invariants": [
+      "clean_value(None) must return None without raising AttributeError",
+      "clean_value(str) must strip leading and trailing whitespace",
+      "parse_headers must preserve None values for keys whose value is None",
+      "validate_key must remain enforced for all keys"
+    ]
+  }
+}
