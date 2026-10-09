@@ -1,0 +1,112 @@
+{
+  "fixture_id": "T08",
+  "name": "recordstore",
+  "version": "0.1.0",
+  "description": "Record storage import utility with repeated run duplicate records bug",
+  "repository_summary_relpath": "manifests/repository_summary_T08.md",
+  "target_test": "tests/test_store.py::test_import_deduplicates_by_id",
+  "target_bug_file": "recordstore/storage.py",
+  "target_bug_symbol": "import_records",
+  "task_instruction_file": "experiment/fixtures/core/T08/task.md",
+  "source_summary": {
+    "total_source_files": 5,
+    "total_test_files": 1,
+    "total_effective_loc": 153,
+    "files": {
+      "import_data.py": {
+        "sha256": "e87543b1977cbf1c941ddb3fcf26dd1c42c483ce534d3383520b4c85d06e072c",
+        "effective_loc": 28
+      },
+      "recordstore/__init__.py": {
+        "sha256": "7db30c71815b4d3a26f4b285b4781053734c59cdf4d3b7ba9dbbfdb626f94365",
+        "effective_loc": 11
+      },
+      "recordstore/io.py": {
+        "sha256": "b714c0c6c6afb44d6f44373a9fd2552ceb98eb528c848e6d4035e0f82880d33c",
+        "effective_loc": 22
+      },
+      "recordstore/storage.py": {
+        "sha256": "2ff8b420487b2abed4d62b1d54ade01d1810e49575e7e8f75c9a1e7edb1e290a",
+        "effective_loc": 32
+      },
+      "recordstore/validator.py": {
+        "sha256": "9f0cd0dc9daeabfa575b3686f56b7b65cb58fd0328a0d24d53343a2a3a5edb81",
+        "effective_loc": 11
+      },
+      "tests/test_store.py": {
+        "sha256": "c1e9ce5718fe6977b811b87f448684d8eebedc7526554e014db274e08283005b",
+        "effective_loc": 49
+      }
+    }
+  },
+  "verification_definitions": {
+    "target_test": "tests/test_store.py::test_import_deduplicates_by_id",
+    "visible_test_suite": "tests/test_store.py",
+    "expected_initial_failing_visible": [
+      "tests/test_store.py::test_import_deduplicates_by_id"
+    ],
+    "expected_initial_passing_visible": [
+      "tests/test_store.py::test_import_new_records",
+      "tests/test_store.py::test_cli_import_script",
+      "tests/test_store.py::test_validate_record_missing_id",
+      "tests/test_store.py::test_load_missing_file_returns_empty",
+      "tests/test_store.py::test_preserve_existing_order"
+    ],
+    "hidden_test_suite_relpath": "hidden_tests/T08/test_hidden_t08.py",
+    "expected_initial_failing_hidden": [
+      "test_hidden_repeated_run_no_duplicates",
+      "test_hidden_mixed_existing_and_new_ids",
+      "test_hidden_multiple_identical_incoming_ids",
+      "test_hidden_cli_invocation_deduplicates"
+    ],
+    "expected_initial_passing_hidden": [
+      "test_hidden_disjoint_ids_all_appended",
+      "test_hidden_empty_incoming_file"
+    ],
+    "preflight": {
+      "baseline_target_exit_code": 1,
+      "baseline_visible": {
+        "total": 6,
+        "passed": 5,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0
+      },
+      "baseline_hidden": {
+        "total": 6,
+        "passed": 2,
+        "failed": 4,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "expected_counts": {
+      "target_test": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "visible_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "hidden_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "semantic_invariants": [
+      "import_records and import_records_file must avoid duplicate records sharing the same 'id'",
+      "Incoming records with new distinct 'id' values must be appended",
+      "Existing stored records must remain preserved in their original order"
+    ]
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "fixture_id": "T05",
+  "name": "userreport",
+  "version": "0.1.0",
+  "description": "User report formatter missing JSON output support in CLI",
+  "repository_summary_relpath": "manifests/repository_summary_T05.md",
+  "target_test": "tests/test_report.py::test_format_json_alice",
+  "target_bug_file": "userreport/formatter.py",
+  "target_bug_symbol": "format_report",
+  "task_instruction_file": "experiment/fixtures/core/T05/task.md",
+  "source_summary": {
+    "total_source_files": 5,
+    "total_test_files": 1,
+    "total_effective_loc": 157,
+    "files": {
+      "tests/test_report.py": {
+        "sha256": "4c494acfbfeb4ebe130f5848dc699d554601350cffaa910ad1842949638e5cf8",
+        "effective_loc": 36
+      },
+      "userreport/__init__.py": {
+        "sha256": "a0ebee27d30a67bbd85ec663c5c77dca2426815ddd887f6c2e58a07ad7e58941",
+        "effective_loc": 13
+      },
+      "userreport/cli.py": {
+        "sha256": "016e3830cffb589d28ca08309b95235ecd204f7b2025034dcb06712f9e2d655b",
+        "effective_loc": 48
+      },
+      "userreport/formatter.py": {
+        "sha256": "8d6403042fc91682c12273a26daceb1d6c1aba2ddefa979b4c65c678e21decf8",
+        "effective_loc": 21
+      },
+      "userreport/models.py": {
+        "sha256": "76a9ad56239b7b45cf5bb3a278301f9f970ae3009263416b6f87d65f55573b11",
+        "effective_loc": 26
+      },
+      "userreport/report.py": {
+        "sha256": "779a68ea683da9375985c41a62a974a55d9b2cac7a904b0d74e08c50ba6e4767",
+        "effective_loc": 13
+      }
+    }
+  },
+  "verification_definitions": {
+    "target_test": "tests/test_report.py::test_format_json_alice",
+    "visible_test_suite": "tests/test_report.py",
+    "expected_initial_failing_visible": [
+      "tests/test_report.py::test_format_json_alice"
+    ],
+    "expected_initial_passing_visible": [
+      "tests/test_report.py::test_format_text_default",
+      "tests/test_report.py::test_format_text_custom_user",
+      "tests/test_report.py::test_cli_text_format",
+      "tests/test_report.py::test_invalid_format_raises",
+      "tests/test_report.py::test_user_model_negative_age"
+    ],
+    "hidden_test_suite_relpath": "hidden_tests/T05/test_hidden_t05.py",
+    "expected_initial_failing_hidden": [
+      "test_hidden_json_different_names",
+      "test_hidden_json_empty_skills",
+      "test_hidden_json_many_skills",
+      "test_hidden_json_types_preserved"
+    ],
+    "expected_initial_passing_hidden": [
+      "test_hidden_text_format_still_works",
+      "test_hidden_invalid_format_raises"
+    ],
+    "preflight": {
+      "baseline_target_exit_code": 1,
+      "baseline_visible": {
+        "total": 6,
+        "passed": 5,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0
+      },
+      "baseline_hidden": {
+        "total": 6,
+        "passed": 2,
+        "failed": 4,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "expected_counts": {
+      "target_test": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "visible_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "hidden_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "semantic_invariants": [
+      "fmt='json' and --format json must return a valid JSON string serializing the report mapping",
+      "fmt='text' formatting must remain intact",
+      "Unknown format strings must continue to raise ValueError"
+    ]
+  }
+}

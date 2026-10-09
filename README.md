@@ -69,6 +69,6 @@ python3 hillclimb.py \
 
 ---
 
-## 实验扩展（Astra 行为评测冒烟）
+## 实验扩展（Astra 工程行为评测）
 
-基于执行隔离契约，[experiment/](experiment/README.md) 包含针对 `gpt-6-astra` 的单次 T02/P0 行为冒烟流水线与执行评估中间件（尚未接入 Hillclimb 优化循环，非统计结论）。详细设计与单次归档记录参见 [experiment/README.md](experiment/README.md)。
+[experiment/](experiment/README.md) 提供独立的 9 任务 × 3 条件 × 3 次重复实验框架，包含执行隔离、隐藏测评、盲 Judge、恢复门禁与证据归档。已完成独立真实冒烟及工程验收，正式 81 次实验尚未启动，也未接入 Hillclimb；单例不构成统计结论。操作与归档见 [experiment/README.md](experiment/README.md)。

@@ -1,0 +1,3 @@
+Carefully validate the implementation.
+
+Run appropriate tests, check for regressions, and make sure the result is correct and robust before finishing.

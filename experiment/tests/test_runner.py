@@ -8,6 +8,7 @@ Verifies:
 4. Fixed model, reasoning effort, ephemeral, no-daemon, restricted permissions profile without dangerous bypasses.
 5. Structured transcript formatting from JSONL event streams.
 6. Dry-run and execution lifecycle ensuring zero model calls without explicit --execute.
+7. Generalized task, condition, repeat, manifest resolution and expected exit code preflight handling.
 """
 from __future__ import annotations
 
@@ -24,12 +25,14 @@ from experiment.runner import (
     EFFORT,
     MODEL,
     PROFILE,
+    ROOT,
     codex_command,
     collect_diff,
     main,
     permission_config,
     prepare_runtime,
     prepare_workspace,
+    resolve_manifest,
     transcript_from_events,
 )
 
@@ -90,13 +93,14 @@ class TestRunnerRuntime(unittest.TestCase):
         self.assertTrue((runtime / "site-packages").is_dir())
         self.assertTrue((runtime / "site-packages" / "pytest_mock.py").exists())
 
-        for name in ("python", "python3", "pytest"):
+        for name in ("python", "python3", "pytest", "git"):
             launcher = runtime / "bin" / name
             self.assertTrue(launcher.is_file())
             self.assertTrue(os.access(str(launcher), os.X_OK))
             content = launcher.read_text(encoding="utf-8")
-            self.assertIn("export PYTHONPATH=", content)
-            self.assertIn(str(runtime / "site-packages"), content)
+            if name != "git":
+                self.assertIn("export PYTHONPATH=", content)
+                self.assertIn(str(runtime / "site-packages"), content)
             if name == "pytest":
                 self.assertIn("-m pytest", content)
 
@@ -227,6 +231,18 @@ class TestRunnerCommandAndSecurity(unittest.TestCase):
         self.assertIn(f'"{self.dependency.resolve()}"="read"', table_json_str)
 
 
+class TestRunnerManifestResolution(unittest.TestCase):
+    def test_resolve_manifest_existing_task(self):
+        p, data = resolve_manifest("T02")
+        self.assertIsNotNone(p)
+        self.assertEqual(data.get("fixture_id"), "T02")
+
+    def test_resolve_manifest_nonexistent_task(self):
+        p, data = resolve_manifest("T99_NONEXISTENT")
+        self.assertIsNone(p)
+        self.assertEqual(data, {})
+
+
 class TestRunnerTranscript(unittest.TestCase):
     def test_transcript_from_events(self):
         raw_events = (
@@ -288,12 +304,37 @@ class TestRunnerMainLifecycle(unittest.TestCase):
         self.assertTrue(meta_path.exists())
         metadata = json.loads(meta_path.read_text(encoding="utf-8"))
         self.assertEqual(metadata["status"], "prepared")
+        self.assertEqual(metadata["experiment_stage"], "layer1/runs")
         self.assertEqual(metadata["target_invocations"], 0)
         self.assertEqual(metadata["target_model"], "gpt-6-astra")
         self.assertEqual(metadata["reasoning_effort"], "medium")
         self.assertEqual(metadata["codex_version"], "codex-cli 0.160.0")
         self.assertIn("runtime_dependency", metadata)
         self.assertTrue(Path(metadata["runtime_dependency"]).is_dir())
+
+    @patch("experiment.runner.subprocess.check_output", return_value="codex-cli 0.160.0\n")
+    @patch("experiment.runner.restricted_probe", return_value={"exit_code": 0, "stdout": "ok", "stderr": ""})
+    @patch("experiment.runner.execute_once")
+    def test_main_parameterized_task_condition_run_index(self, mock_execute, mock_probe, mock_version):
+        """Verifies --task-id, --condition, --run-index properly recorded in metadata and stage is layer1/runs."""
+        with patch("sys.argv", [
+            "runner.py",
+            "--dry-run",
+            "--task-id", "T01",
+            "--condition", "P1",
+            "--run-index", "2",
+            "--fixture", str(self.fixture_dir),
+            "--task", str(self.task_file),
+            "--run-dir", str(self.run_dir),
+        ]):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        metadata = json.loads((self.run_dir / "run_metadata.json").read_text(encoding="utf-8"))
+        self.assertEqual(metadata["task"], "T01")
+        self.assertEqual(metadata["condition"], "P1")
+        self.assertEqual(metadata["run_index"], 2)
+        self.assertEqual(metadata["experiment_stage"], "layer1/runs")
 
     @patch("experiment.runner.subprocess.check_output", return_value="codex-cli 0.160.0\n")
     @patch("experiment.runner.restricted_probe", return_value={"exit_code": 0, "stdout": "ok", "stderr": ""})
@@ -364,6 +405,32 @@ class TestRunnerMainLifecycle(unittest.TestCase):
             with self.assertRaises(SystemExit) as cm:
                 main()
             self.assertEqual(cm.exception.code, 2)
+
+    @patch("experiment.runner.subprocess.check_output", return_value="codex-cli 0.160.0\n")
+    @patch("experiment.runner.restricted_probe", return_value={"exit_code": 0, "stdout": "ok", "stderr": ""})
+    def test_main_batch_and_schedule_metadata(self, mock_probe, mock_version):
+        """Verifies --batch-id, --schedule-index, and --experiment-stage are recorded in run_metadata.json."""
+        with patch("sys.argv", [
+            "runner.py",
+            "--dry-run",
+            "--batch-id", "batch-12345",
+            "--schedule-index", "42",
+            "--experiment-stage", "layer1/runs",
+            "--fixture", str(self.fixture_dir),
+            "--task", str(self.task_file),
+            "--prompt", str(self.prompt_file),
+            "--run-dir", str(self.run_dir),
+        ]):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        meta_path = self.run_dir / "run_metadata.json"
+        self.assertTrue(meta_path.is_file())
+        metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        self.assertEqual(metadata["experiment_stage"], "layer1/runs")
+        self.assertEqual(metadata["batch_id"], "batch-12345")
+        self.assertEqual(metadata["schedule_index"], 42)
+        self.assertEqual(metadata["status"], "prepared")
 
 
 if __name__ == "__main__":

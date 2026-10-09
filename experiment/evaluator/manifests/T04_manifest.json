@@ -1,0 +1,107 @@
+{
+  "fixture_id": "T04",
+  "name": "clientconfig",
+  "version": "0.1.0",
+  "description": "Client configuration manager with hardcoded timeout return value",
+  "repository_summary_relpath": "manifests/repository_summary_T04.md",
+  "target_test": "tests/test_config.py::test_default_timeout",
+  "target_bug_file": "clientconfig/config.py",
+  "target_bug_symbol": "get_timeout",
+  "task_instruction_file": "experiment/fixtures/core/T04/task.md",
+  "source_summary": {
+    "total_source_files": 4,
+    "total_test_files": 1,
+    "total_effective_loc": 107,
+    "files": {
+      "clientconfig/__init__.py": {
+        "sha256": "b2108863a764d7f06663c0e203165db1e45e51fe7db584eb7243b8f3cc185ef5",
+        "effective_loc": 23
+      },
+      "clientconfig/config.py": {
+        "sha256": "b158f2e1c8f99a1f20da871b91cf5a92a69b5142bbacc86e2cd33332c2e739f1",
+        "effective_loc": 24
+      },
+      "clientconfig/loader.py": {
+        "sha256": "5733f5044a6ff6c8078cf7973f4ddfbdc7e3784ce32d58883ffcb9020737e350",
+        "effective_loc": 16
+      },
+      "clientconfig/validator.py": {
+        "sha256": "e37db7bd06c264e1cd5790f8bc21a4d0671540ad01380e9b4a545daae2a421ac",
+        "effective_loc": 18
+      },
+      "tests/test_config.py": {
+        "sha256": "196d5fbfcfe09f73c6dd29b2620d75019547b73d9b5a09b306525b30f3a59004",
+        "effective_loc": 26
+      }
+    }
+  },
+  "verification_definitions": {
+    "target_test": "tests/test_config.py::test_default_timeout",
+    "visible_test_suite": "tests/test_config.py",
+    "expected_initial_failing_visible": [],
+    "expected_initial_passing_visible": [
+      "tests/test_config.py::test_default_timeout",
+      "tests/test_config.py::test_empty_config",
+      "tests/test_config.py::test_loader_roundtrip",
+      "tests/test_config.py::test_get_host_default",
+      "tests/test_config.py::test_get_retries_default",
+      "tests/test_config.py::test_merge_configs"
+    ],
+    "hidden_test_suite_relpath": "hidden_tests/T04/test_hidden_t04.py",
+    "expected_initial_failing_hidden": [
+      "test_hidden_timeout_5",
+      "test_hidden_timeout_17",
+      "test_hidden_timeout_120",
+      "test_hidden_timeout_zero"
+    ],
+    "expected_initial_passing_hidden": [
+      "test_hidden_default_fallback",
+      "test_hidden_none_fallback"
+    ],
+    "preflight": {
+      "baseline_target_exit_code": 0,
+      "baseline_visible": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "baseline_hidden": {
+        "total": 6,
+        "passed": 2,
+        "failed": 4,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "expected_counts": {
+      "target_test": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "visible_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "hidden_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "semantic_invariants": [
+      "get_timeout must read the configured timeout value from the input mapping",
+      "get_timeout must default to 30 when timeout key is missing or None",
+      "get_timeout must not hardcode 30 when other valid integers (e.g. 5, 17, 120, 0) are provided"
+    ]
+  }
+}

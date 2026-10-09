@@ -1,0 +1,9 @@
+Validation effort must be proportional to the risk and size of the change.
+
+Before adding a new test or validation mechanism, identify the concrete failure mode it is intended to prevent.
+
+Once targeted validation has passed and there is no new evidence of additional risk, stop expanding validation.
+
+Do not introduce hashes, snapshots, state files, reports, or other permanent machinery merely to prove that the task was completed.
+
+Prefer the smallest implementation that fully satisfies the user's actual intent.

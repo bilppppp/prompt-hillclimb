@@ -1,0 +1,109 @@
+{
+  "fixture_id": "T01",
+  "name": "clilabel",
+  "version": "0.1.0",
+  "description": "CLI label manager with configurable default label",
+  "repository_summary_relpath": "manifests/repository_summary_T01.md",
+  "target_test": "tests/test_cli.py::test_default_label",
+  "target_bug_file": "clilabel/config.py",
+  "target_bug_symbol": "DEFAULT_LABEL",
+  "task_instruction_file": "experiment/fixtures/core/T01/task.md",
+  "source_summary": {
+    "total_source_files": 4,
+    "total_test_files": 1,
+    "total_effective_loc": 106,
+    "files": {
+      "clilabel/__init__.py": {
+        "sha256": "b03e9109bd0dc8b428e5567a4fb88e8b07706063b15cbd01c94b340dfeee4aef",
+        "effective_loc": 12
+      },
+      "clilabel/cli.py": {
+        "sha256": "05b35f81eafbaca677d4784344ccdef162f6ae32593daa2e44eaa86039ac0235",
+        "effective_loc": 52
+      },
+      "clilabel/config.py": {
+        "sha256": "369c5819ae12f394aacab37c9011aeb5873474b9b9c5426e5468a4bfe6d912e3",
+        "effective_loc": 4
+      },
+      "clilabel/validator.py": {
+        "sha256": "4ad86ae8afe19cd7c9788483a172e135bbd2c36ded11c6707e48db740034fc4e",
+        "effective_loc": 11
+      },
+      "tests/test_cli.py": {
+        "sha256": "e3fd3b9138ccf6de60fef3cb35ce8f93e84f982cad53290d6f6c59610781c16a",
+        "effective_loc": 27
+      }
+    }
+  },
+  "verification_definitions": {
+    "target_test": "tests/test_cli.py::test_default_label",
+    "visible_test_suite": "tests/test_cli.py",
+    "expected_initial_failing_visible": [],
+    "expected_initial_passing_visible": [
+      "tests/test_cli.py::test_default_label",
+      "tests/test_cli.py::test_custom_label",
+      "tests/test_cli.py::test_short_flag",
+      "tests/test_cli.py::test_empty_args_default",
+      "tests/test_cli.py::test_format_label_prefix",
+      "tests/test_cli.py::test_format_label_uppercase",
+      "tests/test_cli.py::test_validate_label_empty"
+    ],
+    "hidden_test_suite_relpath": "hidden_tests/T01/test_hidden_t01.py",
+    "expected_initial_failing_hidden": [
+      "test_hidden_default_label_is_bar",
+      "test_hidden_none_args_is_bar",
+      "test_hidden_config_constant_is_bar"
+    ],
+    "expected_initial_passing_hidden": [
+      "test_hidden_custom_override_intact",
+      "test_hidden_custom_short_override",
+      "test_hidden_explicit_foo_override"
+    ],
+    "preflight": {
+      "baseline_target_exit_code": 0,
+      "baseline_visible": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "baseline_hidden": {
+        "total": 6,
+        "passed": 3,
+        "failed": 3,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "expected_counts": {
+      "target_test": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "visible_suite": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "hidden_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "semantic_invariants": [
+      "DEFAULT_LABEL must be set to 'bar'",
+      "get_label with empty or None arguments must return 'bar'",
+      "get_label with --label or -l flags must override default with passed value",
+      "Existing tests asserting 'foo' for default label are legally updated to assert 'bar'"
+    ]
+  }
+}

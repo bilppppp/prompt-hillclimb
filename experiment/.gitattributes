@@ -1,0 +1,2 @@
+# Unified patches retain a single-space blank context line as evidence.
+results/**/*.patch whitespace=-blank-at-eol

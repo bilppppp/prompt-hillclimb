@@ -1,0 +1,113 @@
+{
+  "fixture_id": "T09",
+  "name": "schemaconvert",
+  "version": "0.1.0",
+  "description": "Schema converter CLI missing full_name concatenation and status field rule",
+  "repository_summary_relpath": "manifests/repository_summary_T09.md",
+  "target_test": "tests/test_convert.py::test_transform_full_name_and_status",
+  "target_bug_file": "schemaconvert/transformer.py",
+  "target_bug_symbol": "transform_record",
+  "task_instruction_file": "experiment/fixtures/core/T09/task.md",
+  "source_summary": {
+    "total_source_files": 5,
+    "total_test_files": 1,
+    "total_effective_loc": 154,
+    "files": {
+      "schemaconvert/__init__.py": {
+        "sha256": "32ce124aab7aa490f774e06adfb7e0483f97508cbe20a7c659cb7500e0a14c86",
+        "effective_loc": 14
+      },
+      "schemaconvert/cli.py": {
+        "sha256": "ebfff02c5191386cb88ff781dfdeef01decb63fe5581ee56e849b5c98dedd935",
+        "effective_loc": 32
+      },
+      "schemaconvert/converter.py": {
+        "sha256": "6f957ab1f9ebb26a3a70b3fd071974d79ec29f3a4ad3c60fc298c5800183847d",
+        "effective_loc": 15
+      },
+      "schemaconvert/io.py": {
+        "sha256": "59bf4890c62df1b3cce9146e0b85c7749a71176f8006bac4dc689064616291b6",
+        "effective_loc": 29
+      },
+      "schemaconvert/transformer.py": {
+        "sha256": "0d6797cca7917938869939a18d19f595d162d4bd863ff80a0e855365e6b39733",
+        "effective_loc": 15
+      },
+      "tests/test_convert.py": {
+        "sha256": "236ca9e3722b6c8fccfcb54dc396c5b262a4c8fb4cae819ec3af8d595b327e36",
+        "effective_loc": 49
+      }
+    }
+  },
+  "verification_definitions": {
+    "target_test": "tests/test_convert.py::test_transform_full_name_and_status",
+    "visible_test_suite": "tests/test_convert.py",
+    "expected_initial_failing_visible": [
+      "tests/test_convert.py::test_transform_full_name_and_status"
+    ],
+    "expected_initial_passing_visible": [
+      "tests/test_convert.py::test_convert_file_empty",
+      "tests/test_convert.py::test_preserve_email",
+      "tests/test_convert.py::test_cli_invocation",
+      "tests/test_convert.py::test_missing_input_file_raises",
+      "tests/test_convert.py::test_invalid_json_raises"
+    ],
+    "hidden_test_suite_relpath": "hidden_tests/T09/test_hidden_t09.py",
+    "expected_initial_failing_hidden": [
+      "test_hidden_convert_only_first_name",
+      "test_hidden_convert_only_last_name",
+      "test_hidden_convert_multiple_records",
+      "test_hidden_convert_cli_execution",
+      "test_hidden_empty_first_and_last_name"
+    ],
+    "expected_initial_passing_hidden": [
+      "test_hidden_output_file_created"
+    ],
+    "preflight": {
+      "baseline_target_exit_code": 1,
+      "baseline_visible": {
+        "total": 6,
+        "passed": 5,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0
+      },
+      "baseline_hidden": {
+        "total": 6,
+        "passed": 1,
+        "failed": 5,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "expected_counts": {
+      "target_test": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "visible_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "hidden_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "semantic_invariants": [
+      "convert_file and transform_record must map first_name and last_name into full_name",
+      "email field must be preserved",
+      "status field with value 'active' must be present in every converted record",
+      "CLI conversion must process input file and write output file"
+    ]
+  }
+}

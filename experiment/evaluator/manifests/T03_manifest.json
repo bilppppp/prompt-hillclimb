@@ -1,0 +1,109 @@
+{
+  "fixture_id": "T03",
+  "name": "itemfilter",
+  "version": "0.1.0",
+  "description": "CLI item filter with string --limit argument bug",
+  "repository_summary_relpath": "manifests/repository_summary_T03.md",
+  "target_test": "tests/test_cli.py::test_cli_custom_limit",
+  "target_bug_file": "itemfilter/cli.py",
+  "target_bug_symbol": "create_parser",
+  "task_instruction_file": "experiment/fixtures/core/T03/task.md",
+  "source_summary": {
+    "total_source_files": 4,
+    "total_test_files": 1,
+    "total_effective_loc": 117,
+    "files": {
+      "itemfilter/__init__.py": {
+        "sha256": "e3bb6908cf9a28492164549efed5261a209ff05e6c2225e966ad3229f294b42b",
+        "effective_loc": 12
+      },
+      "itemfilter/cli.py": {
+        "sha256": "54f9345f23e2dde25946319874071b9b730b228a0d5200a14ff88855080a8096",
+        "effective_loc": 40
+      },
+      "itemfilter/filter.py": {
+        "sha256": "2a2310e91b2bfcb7f4076a2726a68a21968819e595a1f350e79659d73a383b30",
+        "effective_loc": 24
+      },
+      "itemfilter/validator.py": {
+        "sha256": "6e0017e027470eea922e4f3e1caa714288a6a5dbe7e44de4f766cbe39e387e66",
+        "effective_loc": 10
+      },
+      "tests/test_cli.py": {
+        "sha256": "2ba86381110f0c7a9510eeb3c57006f6e7eaf019129f11ea5d93e0a68a154f58",
+        "effective_loc": 31
+      }
+    }
+  },
+  "verification_definitions": {
+    "target_test": "tests/test_cli.py::test_cli_custom_limit",
+    "visible_test_suite": "tests/test_cli.py",
+    "expected_initial_failing_visible": [
+      "tests/test_cli.py::test_cli_custom_limit",
+      "tests/test_cli.py::test_cli_limit_one"
+    ],
+    "expected_initial_passing_visible": [
+      "tests/test_cli.py::test_default_limit",
+      "tests/test_cli.py::test_filter_items_function",
+      "tests/test_cli.py::test_filter_items_empty",
+      "tests/test_cli.py::test_cli_reverse_flag"
+    ],
+    "hidden_test_suite_relpath": "hidden_tests/T03/test_hidden_t03.py",
+    "expected_initial_failing_hidden": [
+      "test_hidden_limit_zero",
+      "test_hidden_limit_three",
+      "test_hidden_limit_large",
+      "test_hidden_limit_type_int",
+      "test_hidden_empty_collection"
+    ],
+    "expected_initial_passing_hidden": [
+      "test_hidden_default_limit_still_int"
+    ],
+    "preflight": {
+      "baseline_target_exit_code": 1,
+      "baseline_visible": {
+        "total": 6,
+        "passed": 4,
+        "failed": 2,
+        "skipped": 0,
+        "errors": 0
+      },
+      "baseline_hidden": {
+        "total": 6,
+        "passed": 1,
+        "failed": 5,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "expected_counts": {
+      "target_test": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "visible_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "hidden_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "semantic_invariants": [
+      "--limit argument must be converted to an integer",
+      "Passing --limit with string representations of numbers must correctly slice collections without TypeError",
+      "Default limit of 10 must be preserved",
+      "Items slicing semantics must remain intact"
+    ]
+  }
+}

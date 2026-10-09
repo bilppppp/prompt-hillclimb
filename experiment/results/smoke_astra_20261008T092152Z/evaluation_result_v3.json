@@ -1,0 +1,218 @@
+{
+  "timestamp": "2026-10-09T01:46:05.592937+00:00",
+  "fixture_id": "T02",
+  "repo_path": "<workspace>",
+  "baseline_path": "<host-project>/experiment/fixtures/core/T02/repo",
+  "evaluator_run": {
+    "target_test": {
+      "target": "tests/test_parser.py::test_parse_header_with_none_value",
+      "passed": true,
+      "exit_code": 0,
+      "evaluation_error": false,
+      "error_type": null,
+      "assertion_failure": false,
+      "duration_seconds": 0.0906,
+      "summary_counts": {
+        "passed": 1,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "total": 1
+      },
+      "test_cases": [
+        {
+          "classname": "tests.test_parser",
+          "name": "test_parse_header_with_none_value",
+          "nodeid": "tests.test_parser::test_parse_header_with_none_value",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        }
+      ],
+      "stdout": ".                                                                        [100%]\n1 passed in 0.01s",
+      "stderr": ""
+    },
+    "visible_suite": {
+      "suite": "tests/test_parser.py",
+      "passed": true,
+      "exit_code": 0,
+      "evaluation_error": false,
+      "error_type": null,
+      "assertion_failure": false,
+      "duration_seconds": 0.0917,
+      "summary_counts": {
+        "passed": 5,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "total": 5
+      },
+      "test_cases": [
+        {
+          "classname": "tests.test_parser",
+          "name": "test_parse_simple_header",
+          "nodeid": "tests.test_parser::test_parse_simple_header",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "tests.test_parser",
+          "name": "test_parse_header_strips_whitespace",
+          "nodeid": "tests.test_parser::test_parse_header_strips_whitespace",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "tests.test_parser",
+          "name": "test_parse_multiple_headers",
+          "nodeid": "tests.test_parser::test_parse_multiple_headers",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "tests.test_parser",
+          "name": "test_parse_invalid_key_raises",
+          "nodeid": "tests.test_parser::test_parse_invalid_key_raises",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "tests.test_parser",
+          "name": "test_parse_header_with_none_value",
+          "nodeid": "tests.test_parser::test_parse_header_with_none_value",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        }
+      ],
+      "stdout": ".....                                                                    [100%]\n5 passed in 0.01s",
+      "stderr": ""
+    },
+    "hidden_suite": {
+      "suite": "<host-project>/experiment/evaluator/hidden_tests/test_parser_hidden.py",
+      "passed": true,
+      "exit_code": 0,
+      "evaluation_error": false,
+      "error_type": null,
+      "assertion_failure": false,
+      "duration_seconds": 0.092,
+      "summary_counts": {
+        "passed": 6,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "total": 6
+      },
+      "test_cases": [
+        {
+          "classname": "test_parser_hidden",
+          "name": "test_clean_value_none_returns_none",
+          "nodeid": "test_parser_hidden::test_clean_value_none_returns_none",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "test_parser_hidden",
+          "name": "test_clean_value_normal_string",
+          "nodeid": "test_parser_hidden::test_clean_value_normal_string",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "test_parser_hidden",
+          "name": "test_clean_value_empty_and_whitespace",
+          "nodeid": "test_parser_hidden::test_clean_value_empty_and_whitespace",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "test_parser_hidden",
+          "name": "test_parse_headers_mixed_none_and_strings",
+          "nodeid": "test_parser_hidden::test_parse_headers_mixed_none_and_strings",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "test_parser_hidden",
+          "name": "test_parse_headers_all_none",
+          "nodeid": "test_parser_hidden::test_parse_headers_all_none",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        },
+        {
+          "classname": "test_parser_hidden",
+          "name": "test_parse_headers_empty_strings",
+          "nodeid": "test_parser_hidden::test_parse_headers_empty_strings",
+          "status": "passed",
+          "time": 0.0,
+          "message": ""
+        }
+      ],
+      "stdout": "......                                                                   [100%]\n6 passed in 0.01s",
+      "stderr": ""
+    }
+  },
+  "agent_run": {
+    "recorded": false,
+    "agent_details": {},
+    "note": "Evaluator runs visible and hidden tests independently in an isolated snapshot from any agent execution."
+  },
+  "code_changes": {
+    "modified_files": [
+      "kvparser/parser.py"
+    ],
+    "added_files": [
+      "xcrun_db"
+    ],
+    "deleted_files": [],
+    "binary_files": [
+      "xcrun_db"
+    ],
+    "tests_edited": [],
+    "source_files_modified": [
+      "kvparser/parser.py"
+    ],
+    "lines_added": 3,
+    "lines_deleted": 1,
+    "net_loc_change": 2,
+    "test_lines_added": 0,
+    "test_lines_deleted": 0,
+    "source_lines_added": 3,
+    "source_lines_deleted": 1,
+    "mechanism_candidates": [
+      "new_source_file:xcrun_db"
+    ],
+    "unified_diff": "--- a/kvparser/parser.py\n+++ b/kvparser/parser.py\n@@ -11,8 +11,10 @@\n         value: The header value string to clean.\n \n     Returns:\n-        The trimmed string value.\n+        The trimmed string value, or None if the value is None.\n     \"\"\"\n+    if value is None:\n+        return None\n     return value.strip()\n \n \nBinary files a/xcrun_db and b/xcrun_db differ\n"
+  },
+  "summary": {
+    "target_test_passed": true,
+    "visible_suite_passed": true,
+    "hidden_suite_passed": true,
+    "has_evaluation_error": false,
+    "evaluation_errors": [],
+    "all_tests_passed": true,
+    "has_code_changes": true,
+    "modified_files_count": 1,
+    "tests_edited": [],
+    "added_visible_tests_count": 0,
+    "added_test_cases": [],
+    "lines_added": 3,
+    "lines_deleted": 1,
+    "net_loc_change": 2,
+    "binary_files": [
+      "xcrun_db"
+    ],
+    "mechanism_candidates": [
+      "new_source_file:xcrun_db"
+    ]
+  }
+}

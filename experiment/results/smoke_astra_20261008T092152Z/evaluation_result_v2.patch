@@ -1,0 +1,15 @@
+--- a/kvparser/parser.py
++++ b/kvparser/parser.py
+@@ -11,8 +11,10 @@
+         value: The header value string to clean.
+ 
+     Returns:
+-        The trimmed string value.
++        The trimmed string value, or None if the value is None.
+     """
++    if value is None:
++        return None
+     return value.strip()
+ 
+ 
+Binary files a/xcrun_db and b/xcrun_db differ

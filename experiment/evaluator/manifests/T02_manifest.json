@@ -3,6 +3,7 @@
   "name": "kvparser",
   "version": "0.1.0",
   "description": "Key-value header parser with None-handling bug in clean_value",
+  "repository_summary_relpath": "repository_summary.md",
   "target_test": "tests/test_parser.py::test_parse_header_with_none_value",
   "target_bug_file": "kvparser/parser.py",
   "target_bug_symbol": "clean_value",
@@ -53,6 +54,23 @@
       "test_clean_value_empty_and_whitespace",
       "test_parse_headers_empty_strings"
     ],
+    "preflight": {
+      "baseline_target_exit_code": 1,
+      "baseline_visible": {
+        "total": 5,
+        "passed": 4,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0
+      },
+      "baseline_hidden": {
+        "total": 6,
+        "passed": 3,
+        "failed": 3,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
     "expected_counts": {
       "target_test": {
         "total": 1,

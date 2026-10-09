@@ -1,0 +1,20 @@
+diff --git a/kvparser/parser.py b/kvparser/parser.py
+index e73615c..5774c48 100644
+--- a/kvparser/parser.py
++++ b/kvparser/parser.py
+@@ -11,8 +11,10 @@ def clean_value(value: str | None) -> str | None:
+         value: The header value string to clean.
+ 
+     Returns:
+-        The trimmed string value.
++        The trimmed string value, or None if the value is None.
+     """
++    if value is None:
++        return None
+     return value.strip()
+ 
+ 
+diff --git a/xcrun_db b/xcrun_db
+new file mode 100644
+index 0000000000000000000000000000000000000000..213acc711b2267a7a252267375dc3b30ba852c5f
+Binary payload omitted from public copy; retained in original local evidence.

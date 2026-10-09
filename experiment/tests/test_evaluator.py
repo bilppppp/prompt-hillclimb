@@ -89,6 +89,8 @@ class TestT02Evaluator(unittest.TestCase):
             self.assertFalse(res["summary"]["has_evaluation_error"])
             self.assertFalse(res["summary"]["has_code_changes"])
             self.assertEqual(res["summary"]["modified_files_count"], 0)
+            self.assertEqual(res["summary"]["added_test_cases"], [])
+            self.assertEqual(res["summary"]["added_visible_tests_count"], 0)
 
             # Artifact file written
             artifact_file = Path(artifact_dir) / "evaluation_result.json"
@@ -153,6 +155,9 @@ class TestT02Evaluator(unittest.TestCase):
                 self.assertEqual(res["code_changes"]["modified_files"], ["kvparser/parser.py"])
                 self.assertEqual(res["summary"]["lines_added"], 2)
                 self.assertEqual(res["summary"]["lines_deleted"], 0)
+                self.assertEqual(res["summary"]["added_test_cases"], [])
+                self.assertEqual(res["summary"]["added_visible_tests_count"], 0)
+                self.assertEqual(res["summary"]["tests_edited"], [])
 
                 # Unified diff generated in patch file
                 patch_file = Path(artifact_dir) / "changes.patch"
@@ -224,6 +229,140 @@ class TestT02Evaluator(unittest.TestCase):
 
             artifact_file = Path(artifact_dir) / "evaluation_result.json"
             self.assertTrue(artifact_file.is_file())
+
+    def test_visible_suite_allows_added_tests(self) -> None:
+        """Visible suite must pass even when new tests are added, without failing the correct implementation."""
+        with tempfile.TemporaryDirectory() as work_dir:
+            temp_repo = Path(work_dir) / "repo"
+            shutil.copytree(FIXTURE_REPO, temp_repo)
+
+            # 1. Apply minimal fix
+            parser_py = temp_repo / "kvparser" / "parser.py"
+            content = parser_py.read_text(encoding="utf-8")
+            fixed_content = content.replace(
+                "    return value.strip()\n",
+                "    if value is None:\n        return None\n    return value.strip()\n",
+            )
+            parser_py.write_text(fixed_content, encoding="utf-8")
+
+            # 2. Add an additional passing test to visible tests
+            test_file = temp_repo / "tests" / "test_parser.py"
+            extra_test = "\n\ndef test_custom_added_case():\n    assert clean_value('  extra  ') == 'extra'\n"
+            test_file.write_text(test_file.read_text(encoding="utf-8") + extra_test, encoding="utf-8")
+
+            res = evaluate(
+                repo_path=temp_repo,
+                manifest_path=MANIFEST_PATH,
+                baseline_path=FIXTURE_REPO,
+            )
+
+            # Visible suite must pass (passed >= 5, here 6)
+            self.assertTrue(res["summary"]["visible_suite_passed"])
+            self.assertEqual(res["summary"]["added_visible_tests_count"], 1)
+            self.assertIn("tests/test_parser.py", res["summary"]["tests_edited"])
+            self.assertEqual(len(res["summary"]["added_test_cases"]), 1)
+            self.assertIn("test_custom_added_case", res["summary"]["added_test_cases"][0])
+            self.assertTrue(res["summary"]["all_tests_passed"])
+
+    def test_added_tests_exact_baseline_identity_and_canonical_matching(self) -> None:
+        """Baseline passing and failing tests are recognized; only genuine additions appear in added_test_cases."""
+        from experiment.evaluator.evaluator import canonical_test_id
+
+        # 1. Canonical ID equivalence tests
+        self.assertEqual(
+            canonical_test_id("tests/test_parser.py::test_parse_header_with_none_value"),
+            canonical_test_id("tests.test_parser::test_parse_header_with_none_value"),
+        )
+        self.assertEqual(
+            canonical_test_id("./tests/test_parser.py::test_parse_simple_header"),
+            canonical_test_id("tests.test_parser::test_parse_simple_header"),
+        )
+        self.assertEqual(
+            canonical_test_id(r"tests\test_parser.py::test_foo"),
+            canonical_test_id("tests.test_parser::test_foo"),
+        )
+        self.assertEqual(
+            canonical_test_id("tests/test_parser.py::TestClass::test_method"),
+            canonical_test_id("tests.test_parser.TestClass::test_method"),
+        )
+        self.assertEqual(
+            canonical_test_id("tests/test_parser.py::test_foo[param1]"),
+            canonical_test_id("tests.test_parser::test_foo[param1]"),
+        )
+
+        # 2. Evaluation with pure minimal fix (no test file change)
+        with tempfile.TemporaryDirectory() as work_dir:
+            temp_repo = Path(work_dir) / "repo"
+            shutil.copytree(FIXTURE_REPO, temp_repo)
+            parser_py = temp_repo / "kvparser" / "parser.py"
+            content = parser_py.read_text(encoding="utf-8")
+            fixed = content.replace(
+                "    return value.strip()\n",
+                "    if value is None:\n        return None\n    return value.strip()\n",
+            )
+            parser_py.write_text(fixed, encoding="utf-8")
+
+            res_fix = evaluate(
+                repo_path=temp_repo,
+                manifest_path=MANIFEST_PATH,
+                baseline_path=FIXTURE_REPO,
+            )
+            # Baseline had 4 passing + 1 failing visible tests.
+            # Now all 5 pass: none are added tests!
+            self.assertEqual(res_fix["summary"]["added_test_cases"], [])
+            self.assertEqual(res_fix["summary"]["added_visible_tests_count"], 0)
+            self.assertEqual(res_fix["summary"]["tests_edited"], [])
+
+            # 3. Add exactly 1 new test to visible suite
+            test_file = temp_repo / "tests" / "test_parser.py"
+            extra_test = "\n\ndef test_completely_new_case():\n    assert True\n"
+            test_file.write_text(test_file.read_text(encoding="utf-8") + extra_test, encoding="utf-8")
+
+            res_added = evaluate(
+                repo_path=temp_repo,
+                manifest_path=MANIFEST_PATH,
+                baseline_path=FIXTURE_REPO,
+            )
+            self.assertEqual(len(res_added["summary"]["added_test_cases"]), 1)
+            self.assertIn("test_completely_new_case", res_added["summary"]["added_test_cases"][0])
+            self.assertEqual(res_added["summary"]["added_visible_tests_count"], 1)
+
+    def test_hidden_suite_rejects_skipped_tests(self) -> None:
+        """Hidden suite must fail if tests are skipped rather than passing."""
+        with tempfile.TemporaryDirectory() as work_dir:
+            temp_repo = Path(work_dir) / "repo"
+            shutil.copytree(FIXTURE_REPO, temp_repo)
+
+            evaluator = DeterministicEvaluator(manifest_path=MANIFEST_PATH)
+            # Simulate a result where hidden tests are all skipped
+            fake_res = {
+                "exit_code": 0,
+                "evaluation_error": False,
+                "counts": {"total": 6, "passed": 0, "failed": 0, "skipped": 6, "errors": 0},
+            }
+            exp_hidden = evaluator.manifest.get("verification_definitions", {}).get("expected_counts", {}).get("hidden_suite", {})
+            exp_hid_total = exp_hidden.get("total", 6)
+            exp_hid_passed = exp_hidden.get("passed", exp_hid_total)
+
+            hidden_counts = fake_res["counts"]
+            hidden_suite_passed = (
+                fake_res["exit_code"] == 0
+                and not fake_res["evaluation_error"]
+                and exp_hid_total > 0
+                and hidden_counts["total"] >= exp_hid_total
+                and hidden_counts["passed"] == exp_hid_passed
+                and hidden_counts["failed"] == 0
+                and hidden_counts["skipped"] == 0
+                and hidden_counts["errors"] == 0
+            )
+            self.assertFalse(hidden_suite_passed)
+
+    def test_dynamic_manifest_resolution_by_fixture_id(self) -> None:
+        """Evaluator resolves manifest dynamically via fixture_id."""
+        evaluator = DeterministicEvaluator(fixture_id="T02")
+        self.assertEqual(evaluator.fixture_id, "T02")
+        self.assertTrue(evaluator.manifest_path.is_file())
+        self.assertTrue(evaluator.baseline_path.is_dir())
 
 
 if __name__ == "__main__":

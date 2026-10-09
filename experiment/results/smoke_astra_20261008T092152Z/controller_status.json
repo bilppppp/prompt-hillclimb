@@ -1,0 +1,21 @@
+{
+  "phase": "completed",
+  "updated_at": "2026-10-08T09:27:08.767264+00:00",
+  "batch_id": "astra-20261008T092152Z",
+  "experiment_stage": "pilot",
+  "task": "T02",
+  "condition": "P0",
+  "run_index": 1,
+  "formal_aggregation": false,
+  "target_invocations": 1,
+  "judge_invocations": 1,
+  "HC": 1,
+  "ISS": 4,
+  "PE": 0,
+  "EVC": 0,
+  "UM": 0,
+  "SD": 2,
+  "under_validation": false,
+  "all_tests_passed": true,
+  "run_dir": "<run-artifacts>"
+}

@@ -1,0 +1,109 @@
+{
+  "fixture_id": "T06",
+  "name": "discountcalc",
+  "version": "0.1.0",
+  "description": "Discount calculation library with addition vs subtraction calculation bug",
+  "repository_summary_relpath": "manifests/repository_summary_T06.md",
+  "target_test": "tests/test_discount.py::test_discount_twenty_percent",
+  "target_bug_file": "discountcalc/calculator.py",
+  "target_bug_symbol": "calculate_discount",
+  "task_instruction_file": "experiment/fixtures/core/T06/task.md",
+  "source_summary": {
+    "total_source_files": 4,
+    "total_test_files": 1,
+    "total_effective_loc": 130,
+    "files": {
+      "discountcalc/__init__.py": {
+        "sha256": "ce801c18be671e56d4a27450effb3c659442688387855e48e90aaf7a933e92c1",
+        "effective_loc": 22
+      },
+      "discountcalc/calculator.py": {
+        "sha256": "69df43ff891cdd39741f153bc96bb9768da8a565ea5a0b10286442aa4ecbacf1",
+        "effective_loc": 34
+      },
+      "discountcalc/formatter.py": {
+        "sha256": "9956c1da0fe938cc609a7330c5c562b414fde2298ab7b31494f41ba561b288e8",
+        "effective_loc": 22
+      },
+      "discountcalc/validator.py": {
+        "sha256": "9f876e7fdff7b330e7b2ed4b49d418e6d56c7dc70e3d7b56e04c1bb4014d5850",
+        "effective_loc": 15
+      },
+      "tests/test_discount.py": {
+        "sha256": "063ac37182fff403f65f9b1e15b8798351a2f13a5512f874f53a2065aaf3e95b",
+        "effective_loc": 37
+      }
+    }
+  },
+  "verification_definitions": {
+    "target_test": "tests/test_discount.py::test_discount_twenty_percent",
+    "visible_test_suite": "tests/test_discount.py",
+    "expected_initial_failing_visible": [
+      "tests/test_discount.py::test_discount_twenty_percent"
+    ],
+    "expected_initial_passing_visible": [
+      "tests/test_discount.py::test_discount_zero",
+      "tests/test_discount.py::test_invalid_rate_raises",
+      "tests/test_discount.py::test_negative_rate_raises",
+      "tests/test_discount.py::test_negative_price_raises",
+      "tests/test_discount.py::test_promo_rate_lookup",
+      "tests/test_discount.py::test_format_summary"
+    ],
+    "hidden_test_suite_relpath": "hidden_tests/T06/test_hidden_t06.py",
+    "expected_initial_failing_hidden": [
+      "test_hidden_discount_10_percent",
+      "test_hidden_discount_50_percent",
+      "test_hidden_discount_full",
+      "test_hidden_discount_small"
+    ],
+    "expected_initial_passing_hidden": [
+      "test_hidden_zero_rate",
+      "test_hidden_invalid_rate_still_raises"
+    ],
+    "preflight": {
+      "baseline_target_exit_code": 1,
+      "baseline_visible": {
+        "total": 7,
+        "passed": 6,
+        "failed": 1,
+        "skipped": 0,
+        "errors": 0
+      },
+      "baseline_hidden": {
+        "total": 6,
+        "passed": 2,
+        "failed": 4,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "expected_counts": {
+      "target_test": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "visible_suite": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      },
+      "hidden_suite": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0
+      }
+    },
+    "semantic_invariants": [
+      "calculate_discount must compute price * (1.0 - rate) rounded to 2 decimals",
+      "Existing test assertions in tests/test_discount.py must remain unchanged and pass through calculator fix",
+      "Boundary validation for rates outside [0.0, 1.0] must remain enforced"
+    ]
+  }
+}

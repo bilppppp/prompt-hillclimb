@@ -1,0 +1,3 @@
+已修复 `kvparser/parser.py`：`clean_value()` 遇到 `None` 时返回 `None`，字符串仍通过 `strip()` 去除首尾空白。
+
+指定测试通过：`1 passed`。未发现新测试失败的证据，已按要求停止。
